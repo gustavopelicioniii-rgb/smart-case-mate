@@ -8,6 +8,7 @@ import CriticalDeadlines from "@/components/dashboard/CriticalDeadlines";
 import SmartActivity from "@/components/dashboard/SmartActivity";
 import RevenueStats from "@/components/dashboard/RevenueStats";
 import AiAssistantButton from "@/components/dashboard/AiAssistantButton";
+import AiRecommendation from "@/components/dashboard/AiRecommendation";
 
 const container = {
   hidden: { opacity: 0 },
@@ -52,6 +53,11 @@ const Dashboard = () => {
         {/* 🟢 Stats de Receita */}
         <motion.div variants={item}>
           <RevenueStats />
+        </motion.div>
+
+        {/* 🧠 Recomendação Estratégica da IA */}
+        <motion.div variants={item}>
+          <AiRecommendation />
         </motion.div>
 
         {/* Atividade Inteligente */}

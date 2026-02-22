@@ -1,4 +1,4 @@
-import { Clock, ArrowUpRight } from "lucide-react";
+import { Clock, ArrowUpRight, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,14 @@ interface Deadline {
   type: string;
   daysLeft: number;
   urgent: boolean;
+  financialImpact: string;
 }
 
 const deadlines: Deadline[] = [
-  { process: "Proc. 0012345-67.2024.8.26.0100", client: "Maria Silva", deadline: "23 Fev 2026", type: "Contestação", daysLeft: 1, urgent: true },
-  { process: "Proc. 0098765-43.2024.5.02.0001", client: "João Santos", deadline: "25 Fev 2026", type: "Recurso Ordinário", daysLeft: 3, urgent: true },
-  { process: "Proc. 1234567-89.2025.8.26.0100", client: "Empresa ABC Ltda", deadline: "28 Fev 2026", type: "Réplica", daysLeft: 6, urgent: false },
-  { process: "Proc. 0054321-12.2025.8.26.0100", client: "Carlos Oliveira", deadline: "05 Mar 2026", type: "Petição Inicial", daysLeft: 11, urgent: false },
+  { process: "Proc. 0012345-67.2024.8.26.0100", client: "Maria Silva", deadline: "23 Fev 2026", type: "Contestação", daysLeft: 1, urgent: true, financialImpact: "R$ 8.000" },
+  { process: "Proc. 0098765-43.2024.5.02.0001", client: "João Santos", deadline: "25 Fev 2026", type: "Recurso Ordinário", daysLeft: 3, urgent: true, financialImpact: "R$ 12.500" },
+  { process: "Proc. 1234567-89.2025.8.26.0100", client: "Empresa ABC Ltda", deadline: "28 Fev 2026", type: "Réplica", daysLeft: 6, urgent: false, financialImpact: "R$ 25.000" },
+  { process: "Proc. 0054321-12.2025.8.26.0100", client: "Carlos Oliveira", deadline: "05 Mar 2026", type: "Petição Inicial", daysLeft: 11, urgent: false, financialImpact: "R$ 5.000" },
 ];
 
 const getDaysLeftColor = (days: number) => {
@@ -69,6 +70,10 @@ const CriticalDeadlines = () => (
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  <div className="hidden sm:flex items-center gap-1.5 rounded-md bg-accent/10 px-2.5 py-1.5">
+                    <DollarSign className="h-3.5 w-3.5 text-accent" />
+                    <span className="text-xs font-bold text-accent">{d.financialImpact}</span>
+                  </div>
                   <Badge variant={d.urgent ? "destructive" : "secondary"}>{d.type}</Badge>
                   <div className="text-right">
                     <p className={`text-sm ${getDaysLeftColor(d.daysLeft)}`}>
@@ -83,6 +88,7 @@ const CriticalDeadlines = () => (
               <p className="font-semibold">{d.client} – {d.type}</p>
               <p className="text-xs mt-1">{d.process}</p>
               <p className="text-xs mt-1">Prazo: {d.deadline} ({d.daysLeft} dias restantes)</p>
+              <p className="text-xs mt-1 font-semibold">💰 Honorários vinculados: {d.financialImpact}</p>
             </TooltipContent>
           </Tooltip>
         ))}
