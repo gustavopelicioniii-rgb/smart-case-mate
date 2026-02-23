@@ -8,20 +8,51 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Calendar,
+  FolderOpen,
+  Newspaper,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navigation = [
+const mainNav = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Processos", href: "/processos", icon: Scale },
-  { name: "Gerador de Peças", href: "/pecas", icon: FileText },
+  { name: "Agenda", href: "/agenda", icon: Calendar },
+  { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true },
   { name: "CRM", href: "/crm", icon: Users },
   { name: "Financeiro", href: "/financeiro", icon: DollarSign },
+];
+
+const secondaryNav = [
+  { name: "Documentos", href: "/documentos", icon: FolderOpen },
+  { name: "Publicações", href: "/publicacoes", icon: Newspaper },
+  { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
+const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType; badge?: boolean }; isActive: boolean }) => (
+  <Link
+    to={item.href}
+    className={cn(
+      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+      isActive
+        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+    )}
+  >
+    <item.icon className={cn("h-5 w-5", isActive && "text-sidebar-primary")} />
+    {item.name}
+    {item.badge && (
+      <Sparkles className="ml-auto h-3.5 w-3.5 text-sidebar-primary" />
+    )}
+  </Link>
+);
+
 const AppSidebar = () => {
   const location = useLocation();
+  const isActive = (href: string) =>
+    href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar border-r border-sidebar-border">
@@ -37,32 +68,25 @@ const AppSidebar = () => {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <item.icon className={cn("h-5 w-5", isActive && "text-sidebar-primary")} />
-              {item.name}
-              {item.name === "Gerador de Peças" && (
-                <Sparkles className="ml-auto h-3.5 w-3.5 text-sidebar-primary" />
-              )}
-            </Link>
-          );
-        })}
+      {/* Main Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        <div className="space-y-1">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50 mb-2">
+            Principal
+          </p>
+          {mainNav.map((item) => (
+            <NavItem key={item.name} item={item} isActive={isActive(item.href)} />
+          ))}
+        </div>
+
+        <div className="space-y-1">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50 mb-2">
+            Ferramentas
+          </p>
+          {secondaryNav.map((item) => (
+            <NavItem key={item.name} item={item} isActive={isActive(item.href)} />
+          ))}
+        </div>
       </nav>
 
       {/* Footer */}
