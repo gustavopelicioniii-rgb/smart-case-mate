@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Scale } from 'lucide-react';
+import { Scale, Eye, EyeOff, Lock } from 'lucide-react';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -14,6 +14,13 @@ const Login: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
     const [fullName, setFullName] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Force password change state
+    const [mustChangePassword, setMustChangePassword] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -38,13 +45,21 @@ const Login: React.FC = () => {
                 toast.success('Cadastro realizado! Verifique seu e-mail ou faça login.');
                 setIsSignUp(false);
             } else {
-                const { error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
                 if (error) throw error;
-                toast.success('Login realizado com sucesso!');
-                navigate(from, { replace: true });
+
+                // Check if user must change password
+                const mustChange = data.user?.user_metadata?.must_change_password === true;
+                if (mustChange) {
+                    setMustChangePassword(true);
+                    toast.info('Por segurança, defina uma nova senha para continuar.');
+                } else {
+                    toast.success('Login realizado com sucesso!');
+                    navigate(from, { replace: true });
+                }
             }
         } catch (error: any) {
             toast.error(error.message || 'Erro durante a autenticação');
@@ -53,6 +68,113 @@ const Login: React.FC = () => {
         }
     };
 
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword.length < 6) {
+            toast.error('A nova senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            toast.error('As senhas não coincidem.');
+            return;
+        }
+        setLoading(true);
+        try {
+            // Update password
+            const { error: pwError } = await supabase.auth.updateUser({
+                password: newPassword,
+            });
+            if (pwError) throw pwError;
+
+            // Remove the must_change_password flag
+            const { error: metaError } = await supabase.auth.updateUser({
+                data: { must_change_password: false },
+            });
+            if (metaError) throw metaError;
+
+            toast.success('Senha atualizada com sucesso!');
+            setMustChangePassword(false);
+            navigate(from, { replace: true });
+        } catch (error: any) {
+            toast.error(error.message || 'Erro ao alterar a senha');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- Force password change screen ---
+    if (mustChangePassword) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+                <Card className="w-full max-w-md shadow-lg border-slate-200">
+                    <CardHeader className="space-y-1 text-center">
+                        <div className="flex justify-center mb-4">
+                            <div className="bg-amber-100 p-3 rounded-full">
+                                <Lock className="h-8 w-8 text-amber-600" />
+                            </div>
+                        </div>
+                        <CardTitle className="text-2xl font-bold tracking-tight">
+                            Redefinir Senha
+                        </CardTitle>
+                        <CardDescription>
+                            Por segurança, defina uma nova senha para acessar o sistema.
+                        </CardDescription>
+                    </CardHeader>
+                    <form onSubmit={handleChangePassword}>
+                        <CardContent className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="newPassword">Nova Senha</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="newPassword"
+                                        type={showNewPassword ? 'text' : 'password'}
+                                        placeholder="Mínimo 6 caracteres"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        required
+                                        minLength={6}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowNewPassword(!showNewPassword)}
+                                    >
+                                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                                <Input
+                                    id="confirmPassword"
+                                    type={showNewPassword ? 'text' : 'password'}
+                                    placeholder="Repita a nova senha"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+                            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                                <p className="text-sm text-destructive">As senhas não coincidem</p>
+                            )}
+                        </CardContent>
+                        <CardFooter className="pt-4">
+                            <Button
+                                className="w-full"
+                                type="submit"
+                                disabled={loading || !newPassword || newPassword !== confirmPassword}
+                            >
+                                {loading ? 'Salvando...' : 'Definir Nova Senha'}
+                            </Button>
+                        </CardFooter>
+                    </form>
+                </Card>
+            </div>
+        );
+    }
+
+    // --- Login / Signup screen ---
     return (
         <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
             <Card className="w-full max-w-md shadow-lg border-slate-200">
@@ -98,13 +220,22 @@ const Login: React.FC = () => {
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="password">Senha</Label>
                             </div>
-                            <Input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4 pt-4">

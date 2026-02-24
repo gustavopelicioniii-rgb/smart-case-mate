@@ -56,7 +56,7 @@ export default function ClientModal({ open, onOpenChange, client, stageId, posit
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
                 <DialogHeader>
                     <DialogTitle className="font-display text-xl">
                         {isEditing ? "Editar Cliente" : "Novo Cliente"}

@@ -19,6 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateProcesso, useUpdateProcesso, type Processo, type ProcessoInsert } from "@/hooks/useProcessos";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeamMembers } from "@/hooks/useTeam";
 
 interface ProcessoModalProps {
     open: boolean;
@@ -48,6 +49,7 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
     const { user } = useAuth();
     const createMutation = useCreateProcesso();
     const updateMutation = useUpdateProcesso();
+    const { data: teamMembers } = useTeamMembers();
     const isEditing = !!processo;
 
     const [form, setForm] = useState<ProcessoInsert>(
@@ -90,9 +92,20 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
 
     const isPending = createMutation.isPending || updateMutation.isPending;
 
+    // Build team member options for responsible dropdown
+    const memberOptions = (teamMembers ?? []).filter(m => m.full_name).map(m => ({
+        value: m.full_name!,
+        label: m.full_name!,
+        role: m.role,
+    }));
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent
+                className="max-w-2xl max-h-[90vh] overflow-y-auto"
+                onInteractOutside={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => e.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle className="font-display text-xl">
                         {isEditing ? "Editar Processo" : "Novo Processo"}
@@ -177,13 +190,23 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="responsible">Advogado Responsável</Label>
-                            <Input
-                                id="responsible"
-                                placeholder="Dr. Fulano"
+                            <Label>Advogado(a) Responsável</Label>
+                            <Select
                                 value={form.responsible}
-                                onChange={(e) => set("responsible", e.target.value)}
-                            />
+                                onValueChange={(v) => set("responsible", v)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o responsável" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {memberOptions.map((m) => (
+                                        <SelectItem key={m.value} value={m.value}>
+                                            {m.label}
+                                            {m.role === "admin" ? " (Admin)" : ""}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="phase">Fase Processual</Label>

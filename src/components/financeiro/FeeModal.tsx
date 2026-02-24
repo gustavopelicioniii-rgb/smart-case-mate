@@ -53,7 +53,7 @@ export default function FeeModal({ open, onOpenChange, fee }: FeeModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
                 <DialogHeader>
                     <DialogTitle className="font-display text-xl">
                         {isEditing ? "Editar Honorário" : "Novo Honorário"}

@@ -16,6 +16,9 @@ import Documentos from "./pages/Documentos";
 import Publicacoes from "./pages/Publicacoes";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Equipe from "./pages/Equipe";
+import WhatsAppPage from "./pages/WhatsApp";
+import MobileMenu from "./pages/MobileMenu";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +48,9 @@ const App = () => (
               <Route path="/publicacoes" element={<Publicacoes />} />
               <Route path="/relatorios" element={<Relatorios />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/equipe" element={<Equipe />} />
+              <Route path="/whatsapp" element={<WhatsAppPage />} />
+              <Route path="/menu" element={<MobileMenu />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -13,6 +13,8 @@ import {
   Newspaper,
   BarChart3,
   Video,
+  UsersRound,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +35,7 @@ const mainNav = [
   { name: "Agenda", href: "/agenda", icon: Calendar, count: todayCount },
   { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true },
   { name: "CRM", href: "/crm", icon: Users },
+  { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
   { name: "Financeiro", href: "/financeiro", icon: DollarSign },
 ];
 
@@ -40,6 +43,7 @@ const secondaryNav = [
   { name: "Documentos", href: "/documentos", icon: FolderOpen },
   { name: "Publicações", href: "/publicacoes", icon: Newspaper },
   { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
+  { name: "Equipe", href: "/equipe", icon: UsersRound },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 

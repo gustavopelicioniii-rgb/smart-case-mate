@@ -1,8 +1,8 @@
-import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     User, Lock, Key, Palette, Save, Loader2, Eye, EyeOff,
-    Shield, LogOut,
+    Shield, LogOut, MessageCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useProfile, useUpdateProfile, changePassword } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppConfig, useSaveWhatsAppConfig } from "@/hooks/useWhatsApp";
 
 const Configuracoes = () => {
     const { user, role, signOut } = useAuth();
@@ -44,6 +49,30 @@ const Configuracoes = () => {
     const [apiKey, setApiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
     const [showApiKey, setShowApiKey] = useState(false);
 
+    // WhatsApp config
+    const { data: waConfig, isLoading: waLoading } = useWhatsAppConfig();
+    const saveWaConfig = useSaveWhatsAppConfig();
+    const [waProvider, setWaProvider] = useState<"cloud_api" | "z_api" | "evolution_api">("z_api");
+    const [waApiUrl, setWaApiUrl] = useState("");
+    const [waApiKey, setWaApiKey] = useState("");
+    const [waInstanceId, setWaInstanceId] = useState("");
+    const [waPhoneNumber, setWaPhoneNumber] = useState("");
+    const [waActive, setWaActive] = useState(false);
+    const [waLoaded, setWaLoaded] = useState(false);
+
+    // Load WhatsApp config
+    useEffect(() => {
+        if (waConfig && !waLoaded) {
+            setWaProvider(waConfig.provider);
+            setWaApiUrl(waConfig.api_url);
+            setWaApiKey(waConfig.api_key);
+            setWaInstanceId(waConfig.instance_id);
+            setWaPhoneNumber(waConfig.phone_number);
+            setWaActive(waConfig.is_active);
+            setWaLoaded(true);
+        }
+    }, [waConfig, waLoaded]);
+
     const handleSaveProfile = async () => {
         await updateProfile.mutateAsync({
             full_name: fullName,
@@ -58,7 +87,7 @@ const Configuracoes = () => {
             return;
         }
         if (newPassword !== confirmPassword) {
-            toast({ title: "Senhas diferentes", description: "A confirmação não coincide com a nova senha.", variant: "destructive" });
+            toast({ title: "Senhas diferentes", description: "A confirmaÃ§Ã£o nÃ£o coincide com a nova senha.", variant: "destructive" });
             return;
         }
         setChangingPassword(true);
@@ -79,6 +108,18 @@ const Configuracoes = () => {
         toast({ title: "Chave da API salva!" });
     };
 
+    const handleSaveWhatsApp = async () => {
+        await saveWaConfig.mutateAsync({
+            owner_id: user?.id ?? "",
+            provider: waProvider,
+            api_url: waApiUrl,
+            api_key: waApiKey,
+            instance_id: waInstanceId,
+            phone_number: waPhoneNumber,
+            is_active: waActive,
+        });
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-24">
@@ -88,11 +129,38 @@ const Configuracoes = () => {
         );
     }
 
+    // Provider-specific placeholder text
+    const providerInfo: Record<string, { urlLabel: string; urlPlaceholder: string; keyLabel: string; keyPlaceholder: string; hasInstance: boolean }> = {
+        z_api: {
+            urlLabel: "URL da InstÃ¢ncia Z-API",
+            urlPlaceholder: "https://api.z-api.io/instances/SUA_INSTANCIA/token/SEU_TOKEN",
+            keyLabel: "Client-Token",
+            keyPlaceholder: "Seu client-token do Z-API",
+            hasInstance: false,
+        },
+        evolution_api: {
+            urlLabel: "URL base da Evolution API",
+            urlPlaceholder: "https://sua-evolution-api.com",
+            keyLabel: "API Key",
+            keyPlaceholder: "Sua apikey da Evolution",
+            hasInstance: true,
+        },
+        cloud_api: {
+            urlLabel: "NÃºmero do Telefone (ID)",
+            urlPlaceholder: "ID do nÃºmero no Meta Business",
+            keyLabel: "Access Token",
+            keyPlaceholder: "Token permanente do Meta",
+            hasInstance: false,
+        },
+    };
+
+    const pInfo = providerInfo[waProvider];
+
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl">
             <div>
-                <h1 className="font-display text-3xl font-bold text-foreground">Configurações</h1>
-                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, segurança e preferências.</p>
+                <h1 className="font-display text-3xl font-bold text-foreground">ConfiguraÃ§Ãµes</h1>
+                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, seguranÃ§a e preferÃªncias.</p>
             </div>
 
             {/* Profile Section */}
@@ -104,7 +172,7 @@ const Configuracoes = () => {
                         </div>
                         <div>
                             <CardTitle className="font-display text-lg">Perfil</CardTitle>
-                            <CardDescription>Informações pessoais e profissionais</CardDescription>
+                            <CardDescription>InformaÃ§Ãµes pessoais e profissionais</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -130,7 +198,7 @@ const Configuracoes = () => {
                             <Label htmlFor="fullName">Nome Completo</Label>
                             <Input
                                 id="fullName"
-                                placeholder="Dr. João Silva"
+                                placeholder="Dr. JoÃ£o Silva"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
                             />
@@ -143,7 +211,7 @@ const Configuracoes = () => {
                                 disabled
                                 className="opacity-60"
                             />
-                            <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
+                            <p className="text-xs text-muted-foreground">O email nÃ£o pode ser alterado.</p>
                         </div>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -157,7 +225,7 @@ const Configuracoes = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="oab">Nº OAB</Label>
+                            <Label htmlFor="oab">NÂº OAB</Label>
                             <Input
                                 id="oab"
                                 placeholder="123456/SP"
@@ -186,7 +254,7 @@ const Configuracoes = () => {
                             <Lock className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg">Segurança</CardTitle>
+                            <CardTitle className="font-display text-lg">SeguranÃ§a</CardTitle>
                             <CardDescription>Altere sua senha de acesso</CardDescription>
                         </div>
                     </div>
@@ -199,7 +267,7 @@ const Configuracoes = () => {
                                 <Input
                                     id="newPassword"
                                     type={showPassword ? "text" : "password"}
-                                    placeholder="Mínimo 6 caracteres"
+                                    placeholder="MÃ­nimo 6 caracteres"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                 />
@@ -243,8 +311,8 @@ const Configuracoes = () => {
                             <Key className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg">Inteligência Artificial</CardTitle>
-                            <CardDescription>Configure a chave da API do Google Gemini para o Gerador de Peças</CardDescription>
+                            <CardTitle className="font-display text-lg">InteligÃªncia Artificial</CardTitle>
+                            <CardDescription>Configure a chave da API do Google Gemini para o Gerador de PeÃ§as</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -283,6 +351,111 @@ const Configuracoes = () => {
                 </CardContent>
             </Card>
 
+            {/* WhatsApp Integration Section */}
+            <Card className="border-green-200">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-700">
+                                <MessageCircle className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="font-display text-lg">WhatsApp Business</CardTitle>
+                                <CardDescription>Integre conversas do WhatsApp ao CRM</CardDescription>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{waActive ? "Ativo" : "Inativo"}</span>
+                            <Switch checked={waActive} onCheckedChange={setWaActive} />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Provedor</Label>
+                        <Select value={waProvider} onValueChange={(v: any) => setWaProvider(v)}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="z_api">Z-API (Recomendado)</SelectItem>
+                                <SelectItem value="evolution_api">Evolution API</SelectItem>
+                                <SelectItem value="cloud_api">Meta Cloud API (Oficial)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>{pInfo.urlLabel}</Label>
+                            <Input
+                                placeholder={pInfo.urlPlaceholder}
+                                value={waProvider === "cloud_api" ? waPhoneNumber : waApiUrl}
+                                onChange={(e) => waProvider === "cloud_api" ? setWaPhoneNumber(e.target.value) : setWaApiUrl(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{pInfo.keyLabel}</Label>
+                            <Input
+                                type="password"
+                                placeholder={pInfo.keyPlaceholder}
+                                value={waApiKey}
+                                onChange={(e) => setWaApiKey(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {pInfo.hasInstance && (
+                        <div className="space-y-2">
+                            <Label>Nome da InstÃ¢ncia</Label>
+                            <Input
+                                placeholder="minha-instancia"
+                                value={waInstanceId}
+                                onChange={(e) => setWaInstanceId(e.target.value)}
+                            />
+                        </div>
+                    )}
+
+                    <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">ðŸ“‹ Como configurar:</p>
+                        {waProvider === "z_api" && (
+                            <>
+                                <p>1. Crie uma conta em <a href="https://z-api.io" target="_blank" className="text-primary underline">z-api.io</a></p>
+                                <p>2. Crie uma instÃ¢ncia e escaneie o QR Code com seu WhatsApp</p>
+                                <p>3. Cole a URL da instÃ¢ncia e o Client-Token acima</p>
+                                <p>4. Configure o webhook de recebimento na Z-API apontando para seu Supabase</p>
+                            </>
+                        )}
+                        {waProvider === "evolution_api" && (
+                            <>
+                                <p>1. Instale a Evolution API no seu servidor</p>
+                                <p>2. Crie uma instÃ¢ncia e escaneie o QR Code</p>
+                                <p>3. Cole a URL, API Key e nome da instÃ¢ncia acima</p>
+                                <p>4. Configure o webhook na Evolution API</p>
+                            </>
+                        )}
+                        {waProvider === "cloud_api" && (
+                            <>
+                                <p>1. Acesse <a href="https://developers.facebook.com" target="_blank" className="text-primary underline">developers.facebook.com</a></p>
+                                <p>2. Crie um app do tipo Business e configure o WhatsApp</p>
+                                <p>3. Obtenha o Token permanente e o ID do nÃºmero</p>
+                                <p>4. Configure o webhook no Meta para seu Supabase</p>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end">
+                        <Button onClick={handleSaveWhatsApp} disabled={saveWaConfig.isPending} className="bg-green-600 hover:bg-green-700">
+                            {saveWaConfig.isPending ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</>
+                            ) : (
+                                <><Save className="mr-2 h-4 w-4" />Salvar WhatsApp</>
+                            )}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Danger Zone */}
             <Card className="border-destructive/30">
                 <CardHeader>
@@ -291,14 +464,14 @@ const Configuracoes = () => {
                             <LogOut className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg text-destructive">Sessão</CardTitle>
-                            <CardDescription>Encerrar a sessão atual</CardDescription>
+                            <CardTitle className="font-display text-lg text-destructive">SessÃ£o</CardTitle>
+                            <CardDescription>Encerrar a sessÃ£o atual</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        Ao sair, você será redirecionado para a tela de login e precisará inserir suas credenciais novamente.
+                        Ao sair, vocÃª serÃ¡ redirecionado para a tela de login e precisarÃ¡ inserir suas credenciais novamente.
                     </p>
                     <Button variant="destructive" onClick={signOut}>
                         <LogOut className="mr-2 h-4 w-4" />Sair da Conta

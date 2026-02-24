@@ -71,6 +71,7 @@ export function useCreateProcesso() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['processos'] });
+            queryClient.invalidateQueries({ queryKey: ['fees'] });
             toast({ title: 'Processo criado com sucesso!' });
         },
         onError: (error: Error) => {
@@ -97,6 +98,7 @@ export function useUpdateProcesso() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['processos'] });
+            queryClient.invalidateQueries({ queryKey: ['fees'] });
             toast({ title: 'Processo atualizado!' });
         },
         onError: (error: Error) => {
@@ -120,6 +122,7 @@ export function useDeleteProcesso() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['processos'] });
+            queryClient.invalidateQueries({ queryKey: ['fees'] });
             toast({ title: 'Processo excluído.' });
         },
         onError: (error: Error) => {

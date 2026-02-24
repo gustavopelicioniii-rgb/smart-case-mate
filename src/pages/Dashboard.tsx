@@ -9,6 +9,15 @@ import SmartActivity from "@/components/dashboard/SmartActivity";
 import RevenueStats from "@/components/dashboard/RevenueStats";
 import AiAssistantButton from "@/components/dashboard/AiAssistantButton";
 import AiRecommendation from "@/components/dashboard/AiRecommendation";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+};
 
 const container = {
   hidden: { opacity: 0 },
@@ -21,16 +30,20 @@ const item = {
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Advogado";
+
   return (
     <>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
         {/* Header + Health Score */}
         <motion.div variants={item} className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">
-              Bom dia, Dr. Advogado
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+              {getGreeting()}, {displayName}
             </h1>
-            <p className="mt-1 text-muted-foreground">
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
               Sua central de decisão — tudo sob controle.
             </p>
           </div>
