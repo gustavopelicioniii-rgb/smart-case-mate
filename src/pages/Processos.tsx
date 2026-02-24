@@ -2,49 +2,32 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Scale, Plus, Search, Filter, Clock, ArrowUpRight, MoreHorizontal,
-  Video, Calendar as CalendarIcon,
+  Video, Pencil, Trash2, Loader2, Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MeetingCard from "@/components/agenda/MeetingCard";
 import NewMeetingModal from "@/components/agenda/NewMeetingModal";
+import ProcessoModal from "@/components/processos/ProcessoModal";
+import CsvImportModal from "@/components/import/CsvImportModal";
 import { mockEvents } from "@/data/mockMeetings";
+import { useProcessos, useProcessoStats, useDeleteProcesso, type Processo } from "@/hooks/useProcessos";
 
 type ProcessStatus = "Em andamento" | "Aguardando prazo" | "Concluído" | "Suspenso";
-
-interface Process {
-  id: string;
-  number: string;
-  client: string;
-  court: string;
-  class: string;
-  subject: string;
-  activeParty: string;
-  passiveParty: string;
-  responsible: string;
-  phase: string;
-  status: ProcessStatus;
-  nextDeadline: string;
-  lastMovement: string;
-  value: string;
-  docsCount: number;
-}
-
-const mockProcesses: Process[] = [
-  { id: "1", number: "0012345-67.2024.8.26.0100", client: "Maria Silva", court: "TJ-SP", class: "Procedimento Comum Cível", subject: "Indenização por Danos Morais", activeParty: "Maria Silva", passiveParty: "Empresa XYZ S.A.", responsible: "Dr. Advogado", phase: "Instrução", status: "Aguardando prazo", nextDeadline: "23 Fev 2026", lastMovement: "Intimação para contestação", value: "R$ 50.000", docsCount: 4 },
-  { id: "2", number: "0098765-43.2024.5.02.0001", client: "João Santos", court: "TRT-2", class: "Reclamação Trabalhista", subject: "Verbas Rescisórias", activeParty: "João Santos", passiveParty: "Comércio Beta Ltda", responsible: "Dr. Advogado", phase: "Recurso", status: "Em andamento", nextDeadline: "25 Fev 2026", lastMovement: "Sentença proferida", value: "R$ 120.000", docsCount: 8 },
-  { id: "3", number: "1234567-89.2025.8.26.0100", client: "Empresa ABC Ltda", court: "TJ-SP", class: "Procedimento Comum Cível", subject: "Cobrança", activeParty: "Empresa ABC Ltda", passiveParty: "Fornecedor Gama ME", responsible: "Dr. Advogado", phase: "Conhecimento", status: "Em andamento", nextDeadline: "28 Fev 2026", lastMovement: "Despacho para perícia", value: "R$ 85.000", docsCount: 3 },
-  { id: "4", number: "0054321-12.2025.8.26.0100", client: "Carlos Oliveira", court: "TJ-SP", class: "Execução de Título", subject: "Execução de Sentença", activeParty: "Carlos Oliveira", passiveParty: "Delta Seguros S.A.", responsible: "Dr. Advogado", phase: "Execução", status: "Concluído", nextDeadline: "—", lastMovement: "Trânsito em julgado", value: "R$ 35.000", docsCount: 12 },
-  { id: "5", number: "0011223-44.2025.5.15.0001", client: "Ana Pereira", court: "TRT-15", class: "Reclamação Trabalhista", subject: "Horas Extras", activeParty: "Ana Pereira", passiveParty: "Indústria Omega Ltda", responsible: "Dr. Advogado", phase: "Petição Inicial", status: "Em andamento", nextDeadline: "05 Mar 2026", lastMovement: "Distribuição", value: "R$ 200.000", docsCount: 2 },
-];
 
 const statusColor: Record<ProcessStatus, string> = {
   "Em andamento": "bg-info/10 text-info border-info/20",
@@ -53,20 +36,53 @@ const statusColor: Record<ProcessStatus, string> = {
   "Suspenso": "bg-muted text-muted-foreground border-border",
 };
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const Processos = () => {
   const [search, setSearch] = useState("");
   const [newMeetingOpen, setNewMeetingOpen] = useState(false);
+  const [processoModalOpen, setProcessoModalOpen] = useState(false);
+  const [editingProcesso, setEditingProcesso] = useState<Processo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
-  const filtered = mockProcesses.filter(
+  const { data: processos, isLoading } = useProcessos();
+  const stats = useProcessoStats();
+  const deleteMutation = useDeleteProcesso();
+
+  const filtered = (processos ?? []).filter(
     (p) =>
       p.client.toLowerCase().includes(search.toLowerCase()) ||
       p.number.includes(search) ||
       p.subject.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Get meetings linked to processes
-  const getProcessMeetings = (processoId: string) =>
-    mockEvents.filter((e) => e.processoId === processoId);
+  const handleEdit = (processo: Processo) => {
+    setEditingProcesso(processo);
+    setProcessoModalOpen(true);
+  };
+
+  const handleNew = () => {
+    setEditingProcesso(null);
+    setProcessoModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deleteTarget) {
+      await deleteMutation.mutateAsync(deleteTarget);
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -77,16 +93,19 @@ const Processos = () => {
             <h1 className="font-display text-3xl font-bold text-foreground">Processos</h1>
             <p className="mt-1 text-muted-foreground">Gerencie e acompanhe todos os seus processos.</p>
           </div>
-          <Button><Plus className="mr-2 h-4 w-4" />Novo Processo</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Importar CSV</Button>
+            <Button onClick={handleNew}><Plus className="mr-2 h-4 w-4" />Novo Processo</Button>
+          </div>
         </div>
 
         {/* Stats cards */}
         <div className="grid gap-4 sm:grid-cols-4">
           {[
-            { label: "Total", value: "24", icon: Scale },
-            { label: "Em andamento", value: "15", icon: ArrowUpRight },
-            { label: "Aguardando prazo", value: "6", icon: Clock },
-            { label: "Concluídos", value: "3", icon: Scale },
+            { label: "Total", value: stats.total, icon: Scale },
+            { label: "Em andamento", value: stats.emAndamento, icon: ArrowUpRight },
+            { label: "Aguardando prazo", value: stats.aguardandoPrazo, icon: Clock },
+            { label: "Concluídos", value: stats.concluidos, icon: Scale },
           ].map((s) => (
             <Card key={s.label}>
               <CardContent className="flex items-center gap-4 p-4">
@@ -113,64 +132,103 @@ const Processos = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Cliente / Partes</TableHead>
-                  <TableHead>Tribunal</TableHead>
-                  <TableHead>Classe / Assunto</TableHead>
-                  <TableHead>Fase</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Próx. Prazo</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((p) => (
-                  <Tooltip key={p.id}>
-                    <TooltipTrigger asChild>
-                      <TableRow className="cursor-pointer">
-                        <TableCell className="font-mono text-xs">{p.number}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">{p.client}</p>
-                            <p className="text-xs text-muted-foreground">{p.activeParty} vs {p.passiveParty}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{p.court}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="text-sm">{p.class}</p>
-                            <p className="text-xs text-muted-foreground">{p.subject}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{p.phase}</TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor[p.status]}`}>{p.status}</span>
-                        </TableCell>
-                        <TableCell className="text-sm">{p.nextDeadline}</TableCell>
-                        <TableCell className="font-medium">{p.value}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </TableRow>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" className="max-w-sm">
-                      <div className="space-y-1.5">
-                        <p className="font-semibold">{p.client}</p>
-                        <p className="text-xs">📋 {p.class} — {p.subject}</p>
-                        <p className="text-xs">👤 Responsável: {p.responsible}</p>
-                        <p className="text-xs">📄 Última mov.: {p.lastMovement}</p>
-                        <p className="text-xs">📎 {p.docsCount} documentos vinculados</p>
-                        <p className="text-xs font-semibold">💰 Valor: {p.value}</p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </TableBody>
-            </Table>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-3 text-muted-foreground">Carregando processos...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Scale className="h-12 w-12 text-muted-foreground/50" />
+                <p className="mt-4 text-lg font-medium text-foreground">Nenhum processo encontrado</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {search ? "Tente uma busca diferente." : "Clique em \"Novo Processo\" para cadastrar o primeiro."}
+                </p>
+                {!search && (
+                  <Button onClick={handleNew} className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />Cadastrar Primeiro Processo
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente / Partes</TableHead>
+                    <TableHead>Tribunal</TableHead>
+                    <TableHead>Classe / Assunto</TableHead>
+                    <TableHead>Fase</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Próx. Prazo</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((p) => (
+                    <Tooltip key={p.id}>
+                      <TooltipTrigger asChild>
+                        <TableRow className="cursor-pointer" onDoubleClick={() => handleEdit(p)}>
+                          <TableCell className="font-mono text-xs">{p.number}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm">{p.client}</p>
+                              <p className="text-xs text-muted-foreground">{p.active_party} vs {p.passive_party}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{p.court}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="text-sm">{p.class}</p>
+                              <p className="text-xs text-muted-foreground">{p.subject}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{p.phase}</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor[p.status]}`}>
+                              {p.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm">{formatDate(p.next_deadline)}</TableCell>
+                          <TableCell className="font-medium">{formatCurrency(p.value)}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEdit(p)}>
+                                  <Pencil className="mr-2 h-4 w-4" />Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => setDeleteTarget(p.id)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-sm">
+                        <div className="space-y-1.5">
+                          <p className="font-semibold">{p.client}</p>
+                          <p className="text-xs">📋 {p.class} — {p.subject}</p>
+                          <p className="text-xs">👤 Responsável: {p.responsible}</p>
+                          <p className="text-xs">📄 Última mov.: {p.last_movement}</p>
+                          <p className="text-xs">📎 {p.docs_count} documentos vinculados</p>
+                          <p className="text-xs font-semibold">💰 Valor: {formatCurrency(p.value)}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -199,6 +257,32 @@ const Processos = () => {
       </motion.div>
 
       <NewMeetingModal open={newMeetingOpen} onOpenChange={setNewMeetingOpen} />
+
+      <ProcessoModal
+        key={editingProcesso?.id ?? "new"}
+        open={processoModalOpen}
+        onOpenChange={setProcessoModalOpen}
+        processo={editingProcesso}
+      />
+      <CsvImportModal open={importOpen} onOpenChange={setImportOpen} type="processos" />
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Processo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este processo? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 };

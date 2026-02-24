@@ -17,6 +17,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { mockEvents } from "@/data/mockMeetings";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
 // Count today's meetings for badge
 const todayCount = mockEvents.filter((e) => {
@@ -66,8 +68,17 @@ const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon:
 
 const AppSidebar = () => {
   const location = useLocation();
+  const { user, role, signOut } = useAuth();
+  const { data: profile } = useProfile();
   const isActive = (href: string) =>
     href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
+
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
+  const initials = displayName
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase())
+    .slice(0, 2)
+    .join("");
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar border-r border-sidebar-border">
@@ -108,17 +119,21 @@ const AppSidebar = () => {
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
-            AD
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-accent-foreground truncate">
-              Dr. Advogado
+              {displayName}
             </p>
             <p className="text-xs text-sidebar-foreground truncate">
-              Plano Profissional
+              {role === "admin" ? "Administrador" : "Advogado"}
             </p>
           </div>
-          <button className="text-sidebar-foreground hover:text-sidebar-accent-foreground">
+          <button
+            onClick={signOut}
+            className="text-sidebar-foreground hover:text-sidebar-accent-foreground"
+            title="Sair"
+          >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
@@ -128,3 +143,4 @@ const AppSidebar = () => {
 };
 
 export default AppSidebar;
+
