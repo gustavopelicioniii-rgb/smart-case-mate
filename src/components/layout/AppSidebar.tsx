@@ -12,13 +12,23 @@ import {
   FolderOpen,
   Newspaper,
   BarChart3,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { mockEvents } from "@/data/mockMeetings";
+
+// Count today's meetings for badge
+const todayCount = mockEvents.filter((e) => {
+  const today = new Date();
+  const d = new Date(e.data);
+  return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+}).length;
 
 const mainNav = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Processos", href: "/processos", icon: Scale },
-  { name: "Agenda", href: "/agenda", icon: Calendar },
+  { name: "Agenda", href: "/agenda", icon: Calendar, count: todayCount },
   { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true },
   { name: "CRM", href: "/crm", icon: Users },
   { name: "Financeiro", href: "/financeiro", icon: DollarSign },
@@ -31,7 +41,7 @@ const secondaryNav = [
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
-const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType; badge?: boolean }; isActive: boolean }) => (
+const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType; badge?: boolean; count?: number }; isActive: boolean }) => (
   <Link
     to={item.href}
     className={cn(
@@ -45,6 +55,11 @@ const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon:
     {item.name}
     {item.badge && (
       <Sparkles className="ml-auto h-3.5 w-3.5 text-sidebar-primary" />
+    )}
+    {item.count != null && item.count > 0 && (
+      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary text-[10px] font-bold text-sidebar-primary-foreground px-1">
+        {item.count}
+      </span>
     )}
   </Link>
 );
