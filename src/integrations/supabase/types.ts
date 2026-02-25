@@ -216,6 +216,36 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['agenda_events']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['agenda_events']['Insert']>;
       };
+      andamentos: {
+        Row: {
+          id: string;
+          process_id: string;
+          data: string;
+          tipo: string;
+          descricao: string;
+          responsavel_id: string | null;
+          owner_id: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['andamentos']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['andamentos']['Insert']>;
+      };
+      audiencias: {
+        Row: {
+          id: string;
+          process_id: string;
+          data: string;
+          tipo: string;
+          local: string | null;
+          link_meet: string | null;
+          status: string;
+          owner_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['audiencias']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['audiencias']['Insert']>;
+      };
     };
   };
 }

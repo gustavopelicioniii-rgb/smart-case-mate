@@ -3,23 +3,64 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
     ArrowLeft, Clock, Calendar, FileText,
-    DollarSign, MessageSquare, Loader2, Plus,
-    Hash, User, MapPin, ExternalLink
+    MessageSquare, Loader2, Plus, Hash, User, MapPin, ExternalLink,
+    MoreHorizontal, Pencil
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery } from "@tanstack/react-query";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const TIPOS_ANDAMENTO = ["Movimentação", "Despacho", "Decisão", "Petição", "Outro"];
+const TIPOS_AUDIENCIA = ["Conciliação", "Instrução", "Julgamento", "Outra"];
+const STATUS_PROCESSO = ["Em andamento", "Aguardando prazo", "Concluído", "Suspenso"] as const;
 
 const ProcessoDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState("timeline");
+    const [andamentoOpen, setAndamentoOpen] = useState(false);
+    const [audienciaOpen, setAudienciaOpen] = useState(false);
+    const [statusOpen, setStatusOpen] = useState(false);
+    const [novoStatus, setNovoStatus] = useState<string>("");
+    const [andamentoData, setAndamentoData] = useState(() => format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+    const [andamentoTipo, setAndamentoTipo] = useState("Movimentação");
+    const [andamentoDescricao, setAndamentoDescricao] = useState("");
+    const [audienciaData, setAudienciaData] = useState(() => format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+    const [audienciaTipo, setAudienciaTipo] = useState("Conciliação");
+    const [audienciaLocal, setAudienciaLocal] = useState("");
+    const [audienciaLink, setAudienciaLink] = useState("");
 
     const { data: processo, isLoading } = useQuery({
         queryKey: ['processo', id],
@@ -42,8 +83,8 @@ const ProcessoDetail = () => {
                 .select('*')
                 .eq('process_id', id)
                 .order('data', { ascending: false });
-            if (error) throw error;
-            return data;
+            if (error) return [];
+            return data ?? [];
         },
         enabled: !!id,
     });
@@ -56,10 +97,64 @@ const ProcessoDetail = () => {
                 .select('*')
                 .eq('process_id', id)
                 .order('data', { ascending: true });
-            if (error) throw error;
-            return data;
+            if (error) return [];
+            return data ?? [];
         },
         enabled: !!id,
+    });
+
+    const createAndamento = useMutation({
+        mutationFn: async (payload: { data: string; tipo: string; descricao: string }) => {
+            const { error } = await supabase.from('andamentos').insert({
+                process_id: id,
+                data: payload.data,
+                tipo: payload.tipo,
+                descricao: payload.descricao,
+                owner_id: user?.id ?? null,
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['timeline', id] });
+            toast.success('Andamento adicionado.');
+            setAndamentoOpen(false);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const createAudiencia = useMutation({
+        mutationFn: async (payload: { data: string; tipo: string; local?: string; link_meet?: string }) => {
+            const { error } = await supabase.from('audiencias').insert({
+                process_id: id,
+                data: payload.data,
+                tipo: payload.tipo,
+                local: payload.local || null,
+                link_meet: payload.link_meet || null,
+                status: 'Agendada',
+                owner_id: user?.id ?? null,
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['audiencias', id] });
+            toast.success('Audiência agendada.');
+            setAudienciaOpen(false);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const updateStatus = useMutation({
+        mutationFn: async (status: typeof STATUS_PROCESSO[number]) => {
+            const { error } = await supabase.from('processos').update({ status }).eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['processo', id] });
+            queryClient.invalidateQueries({ queryKey: ['processos'] });
+            toast.success('Status atualizado.');
+            setStatusOpen(false);
+        },
+        onError: (e: Error) => toast.error(e.message),
     });
 
     if (isLoading) {
@@ -95,8 +190,19 @@ const ProcessoDetail = () => {
                     <p className="text-muted-foreground">{processo.client} • {processo.court}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm"><Plus className="mr-2 h-4 w-4" /> Novo Andamento</Button>
-                    <Button size="sm">Ações do Processo</Button>
+                    <Button variant="outline" size="sm" onClick={() => setAndamentoOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Novo Andamento
+                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm">Ações do Processo</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setNovoStatus(processo.status); setStatusOpen(true); }}>
+                                <Pencil className="mr-2 h-4 w-4" /> Alterar status
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
@@ -181,7 +287,10 @@ const ProcessoDetail = () => {
                             <div className="relative pl-6 space-y-8 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-px before:bg-border">
                                 {!timeline || timeline.length === 0 ? (
                                     <div className="text-center py-10 text-muted-foreground">
-                                        Nenhum andamento registrado. Adicione andamentos para construir a timeline.
+                                        <p className="mb-4">Nenhum andamento registrado. Adicione andamentos para construir a timeline.</p>
+                                        <Button size="sm" variant="outline" onClick={() => setAndamentoOpen(true)}>
+                                            <Plus className="mr-2 h-4 w-4" /> Novo Andamento
+                                        </Button>
                                     </div>
                                 ) : (
                                     timeline.map((item) => (
@@ -207,7 +316,9 @@ const ProcessoDetail = () => {
                                 <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
                                     <Calendar className="h-10 w-10 mx-auto mb-4 opacity-20" />
                                     <p className="text-sm">Nenhuma audiência agendada.</p>
-                                    <Button size="sm" variant="outline" className="mt-4">Agendar Audiência</Button>
+                                    <Button size="sm" variant="outline" className="mt-4" onClick={() => setAudienciaOpen(true)}>
+                                        Agendar Audiência
+                                    </Button>
                                 </div>
                             ) : (
                                 audiencias.map((aud) => (
@@ -255,6 +366,157 @@ const ProcessoDetail = () => {
                     </Tabs>
                 </div>
             </div>
+
+            {/* Modal Novo Andamento */}
+            <Dialog open={andamentoOpen} onOpenChange={setAndamentoOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Novo Andamento</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <Label>Data e hora</Label>
+                            <Input
+                                type="datetime-local"
+                                value={andamentoData}
+                                onChange={(e) => setAndamentoData(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Tipo</Label>
+                            <Select value={andamentoTipo} onValueChange={setAndamentoTipo}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {TIPOS_ANDAMENTO.map((t) => (
+                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label>Descrição</Label>
+                            <Textarea
+                                placeholder="Descreva o andamento..."
+                                value={andamentoDescricao}
+                                onChange={(e) => setAndamentoDescricao(e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAndamentoOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={() => {
+                                if (!andamentoDescricao.trim()) {
+                                    toast.error("Informe a descrição.");
+                                    return;
+                                }
+                                createAndamento.mutateAsync({
+                                    data: new Date(andamentoData).toISOString(),
+                                    tipo: andamentoTipo,
+                                    descricao: andamentoDescricao.trim(),
+                                });
+                            }}
+                            disabled={createAndamento.isPending}
+                        >
+                            {createAndamento.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Adicionar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal Agendar Audiência */}
+            <Dialog open={audienciaOpen} onOpenChange={setAudienciaOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Agendar Audiência</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <Label>Data e hora</Label>
+                            <Input
+                                type="datetime-local"
+                                value={audienciaData}
+                                onChange={(e) => setAudienciaData(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Tipo</Label>
+                            <Select value={audienciaTipo} onValueChange={setAudienciaTipo}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {TIPOS_AUDIENCIA.map((t) => (
+                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label>Local (opcional)</Label>
+                            <Input
+                                placeholder="Ex: Sala 1, Fórum"
+                                value={audienciaLocal}
+                                onChange={(e) => setAudienciaLocal(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Link Meet / Zoom (opcional)</Label>
+                            <Input
+                                placeholder="https://..."
+                                value={audienciaLink}
+                                onChange={(e) => setAudienciaLink(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAudienciaOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={() => {
+                                createAudiencia.mutateAsync({
+                                    data: new Date(audienciaData).toISOString(),
+                                    tipo: audienciaTipo,
+                                    local: audienciaLocal.trim() || undefined,
+                                    link_meet: audienciaLink.trim() || undefined,
+                                });
+                            }}
+                            disabled={createAudiencia.isPending}
+                        >
+                            {createAudiencia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Agendar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dialog Alterar status */}
+            <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Alterar status do processo</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <Select value={novoStatus} onValueChange={setNovoStatus}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {STATUS_PROCESSO.map((s) => (
+                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setStatusOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={() => updateStatus.mutateAsync(novoStatus as typeof STATUS_PROCESSO[number])}
+                            disabled={updateStatus.isPending}
+                        >
+                            {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Salvar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 };
