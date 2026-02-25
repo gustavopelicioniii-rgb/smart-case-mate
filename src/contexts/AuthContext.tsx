@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 
 type UserRole = 'admin' | 'lawyer' | null;
+const VALID_ROLES: UserRole[] = ['admin', 'lawyer'];
 
 interface AuthContextType {
     session: Session | null;
@@ -19,9 +20,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [role, setRole] = useState<UserRole>(null);
     const [loading, setLoading] = useState(true);
+    const fetchIdRef = useRef(0);
 
     useEffect(() => {
-        // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
@@ -32,7 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         });
 
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
@@ -48,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const fetchUserRole = async (userId: string) => {
+        const currentFetchId = ++fetchIdRef.current;
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -55,18 +56,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .eq('id', userId)
                 .single();
 
+            if (currentFetchId !== fetchIdRef.current) return;
             if (error) throw error;
-            setRole(data.role as UserRole);
-        } catch (error) {
-            console.error('Error fetching user role:', error);
-            setRole(null);
+
+            const validRole = VALID_ROLES.includes(data.role as UserRole) ? (data.role as UserRole) : null;
+            setRole(validRole);
+        } catch {
+            if (currentFetchId === fetchIdRef.current) {
+                setRole(null);
+            }
         } finally {
-            setLoading(false);
+            if (currentFetchId === fetchIdRef.current) {
+                setLoading(false);
+            }
         }
     };
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        try {
+            await supabase.auth.signOut();
+        } catch {
+            setSession(null);
+            setUser(null);
+            setRole(null);
+        }
     };
 
     return (

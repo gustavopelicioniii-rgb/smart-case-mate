@@ -27,6 +27,7 @@ export function usePecas() {
             if (error) throw error;
             return data as GeneratedPeca[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -70,10 +71,13 @@ export function useDeletePeca() {
 // --- Gemini API call ---
 export async function generateWithGemini(apiKey: string, prompt: string): Promise<string> {
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+            },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -85,7 +89,7 @@ export async function generateWithGemini(apiKey: string, prompt: string): Promis
     );
 
     if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error?.message || 'Erro ao chamar a API Gemini');
     }
 

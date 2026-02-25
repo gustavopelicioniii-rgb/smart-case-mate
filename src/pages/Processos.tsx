@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Scale, Plus, Search, Filter, Clock, ArrowUpRight, MoreHorizontal,
-  Video, Pencil, Trash2, Loader2, Upload,
+  Video, Pencil, Trash2, Loader2, Upload, Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import MeetingCard from "@/components/agenda/MeetingCard";
 import NewMeetingModal from "@/components/agenda/NewMeetingModal";
 import ProcessoModal from "@/components/processos/ProcessoModal";
 import CsvImportModal from "@/components/import/CsvImportModal";
-import { mockEvents } from "@/data/mockMeetings";
 import { useProcessos, useProcessoStats, useDeleteProcesso, type Processo } from "@/hooks/useProcessos";
 
 type ProcessStatus = "Em andamento" | "Aguardando prazo" | "Concluído" | "Suspenso";
@@ -49,6 +48,7 @@ const formatDate = (dateStr: string | null) => {
 };
 
 const Processos = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [newMeetingOpen, setNewMeetingOpen] = useState(false);
   const [processoModalOpen, setProcessoModalOpen] = useState(false);
@@ -169,7 +169,10 @@ const Processos = () => {
                   {filtered.map((p) => (
                     <Tooltip key={p.id}>
                       <TooltipTrigger asChild>
-                        <TableRow className="cursor-pointer" onDoubleClick={() => handleEdit(p)}>
+                        <TableRow
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => navigate(`/processos/${p.id}`)}
+                        >
                           <TableCell className="font-mono text-xs">{p.number}</TableCell>
                           <TableCell>
                             <div>
@@ -193,24 +196,34 @@ const Processos = () => {
                           <TableCell className="text-sm">{formatDate(p.next_deadline)}</TableCell>
                           <TableCell className="font-medium">{formatCurrency(p.value)}</TableCell>
                           <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEdit(p)}>
-                                  <Pencil className="mr-2 h-4 w-4" />Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => setDeleteTarget(p.id)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />Excluir
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => navigate(`/processos/${p.id}`)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEdit(p)}>
+                                    <Pencil className="mr-2 h-4 w-4" />Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => setDeleteTarget(p.id)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />Excluir
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       </TooltipTrigger>
@@ -245,13 +258,9 @@ const Processos = () => {
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockEvents
-              .filter((e) => e.processoId)
-              .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
-              .slice(0, 5)
-              .map((event) => (
-                <MeetingCard key={event.id} event={event} compact />
-              ))}
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhuma reunião vinculada a processos no momento. Use a Agenda para agendar.
+            </p>
           </CardContent>
         </Card>
       </motion.div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Video, MapPin, Link as LinkIcon, Users, Clock, Sparkles } from "lucide-react";
+import { CalendarIcon, Video, MapPin, Link as LinkIcon, Users, Clock, Sparkles, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { mockClients, mockProcessos } from "@/data/mockMeetings";
+import { Switch } from "@/components/ui/switch";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useCrmClients } from "@/hooks/useCrm";
+import { useProcessos } from "@/hooks/useProcessos";
 import type { MeetingType } from "@/types/agenda";
 
 interface NewMeetingModalProps {
@@ -36,6 +39,12 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
   const [participantes, setParticipantes] = useState("");
   const [tipo, setTipo] = useState<MeetingType>("presencial");
   const [link, setLink] = useState("");
+  const [syncGoogle, setSyncGoogle] = useState(true);
+  const [createMeet, setCreateMeet] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const gcal = useGoogleCalendar();
+  const { data: crmClients } = useCrmClients();
+  const { data: processos } = useProcessos();
 
   const handleGenerateLink = () => {
     const fakeLink =
@@ -46,16 +55,45 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
     toast.success("Link gerado automaticamente");
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!titulo || !data) {
       toast.error("Preencha ao menos o título e a data.");
       return;
     }
-    toast.success("Reunião criada com sucesso!", { description: `${titulo} – ${format(data, "dd/MM/yyyy")} às ${horaInicio}` });
-    onOpenChange(false);
-    // Reset
-    setTitulo(""); setClienteId(""); setProcessoId(""); setData(undefined);
-    setHoraInicio("09:00"); setHoraFim("10:00"); setParticipantes(""); setTipo("presencial"); setLink("");
+    setIsCreating(true);
+    try {
+      if (gcal.isConnected && syncGoogle) {
+        const startDateTime = `${format(data, "yyyy-MM-dd")}T${horaInicio}:00`;
+        const endDateTime = `${format(data, "yyyy-MM-dd")}T${horaFim}:00`;
+        const attendeeEmails = participantes
+          .split(",")
+          .map(p => p.trim())
+          .filter(p => p.includes("@"));
+
+        const created = await gcal.createEvent({
+          summary: titulo,
+          startDateTime,
+          endDateTime,
+          createMeet: createMeet || tipo === "google-meet",
+          attendees: attendeeEmails,
+        });
+
+        if (created?.hangoutLink) {
+          setLink(created.hangoutLink);
+        }
+      }
+      toast.success("Reunião criada com sucesso!", {
+        description: `${titulo} – ${format(data, "dd/MM/yyyy")} às ${horaInicio}`,
+      });
+      onOpenChange(false);
+      setTitulo(""); setClienteId(""); setProcessoId(""); setData(undefined);
+      setHoraInicio("09:00"); setHoraFim("10:00"); setParticipantes(""); setTipo("presencial"); setLink("");
+      setSyncGoogle(true); setCreateMeet(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao criar reunião");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -79,7 +117,7 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
               <Select value={clienteId} onValueChange={setClienteId}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
                 <SelectContent>
-                  {mockClients.map((c) => (
+                  {(crmClients ?? []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -90,8 +128,8 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
               <Select value={processoId} onValueChange={setProcessoId}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
-                  {mockProcessos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.number.slice(0, 20)}…</SelectItem>
+                  {(processos ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{(p.number || "").slice(0, 20)}{(p.number?.length ?? 0) > 20 ? "…" : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -168,11 +206,46 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
               </div>
             </div>
           )}
+
+          {/* Google Calendar sync options */}
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-blue-600" />
+                <Label className="cursor-pointer">Sincronizar com Google Calendar</Label>
+              </div>
+              <Switch
+                checked={syncGoogle}
+                onCheckedChange={setSyncGoogle}
+                disabled={!gcal.isConnected}
+              />
+            </div>
+            {!gcal.isConnected && (
+              <p className="text-xs text-muted-foreground">
+                Conecte o Google Calendar na página da Agenda para ativar a sincronização.
+              </p>
+            )}
+            {gcal.isConnected && syncGoogle && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Video className="h-4 w-4 text-green-600" />
+                  <Label className="cursor-pointer text-sm">Criar Google Meet automaticamente</Label>
+                </div>
+                <Switch checked={createMeet} onCheckedChange={setCreateMeet} />
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleCreate}>Criar reunião</Button>
+          <Button onClick={handleCreate} disabled={isCreating}>
+            {isCreating ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando...</>
+            ) : (
+              "Criar reunião"
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

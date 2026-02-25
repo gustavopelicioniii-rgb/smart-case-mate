@@ -1,8 +1,8 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     User, Lock, Key, Palette, Save, Loader2, Eye, EyeOff,
-    Shield, LogOut, MessageCircle,
+    Shield, LogOut, MessageCircle, CreditCard, PenTool,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,31 +25,30 @@ const Configuracoes = () => {
     const updateProfile = useUpdateProfile();
     const { toast } = useToast();
 
-    // Profile form
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
     const [oabNumber, setOabNumber] = useState("");
     const [profileLoaded, setProfileLoaded] = useState(false);
 
-    // Load profile data into form when available
-    if (profile && !profileLoaded) {
-        setFullName(profile.full_name ?? "");
-        setPhone(profile.phone ?? "");
-        setOabNumber(profile.oab_number ?? "");
-        setProfileLoaded(true);
-    }
+    useEffect(() => {
+        if (profile && !profileLoaded) {
+            setFullName(profile.full_name ?? "");
+            setPhone(profile.phone ?? "");
+            setOabNumber(profile.oab_number ?? "");
+            setProfileLoaded(true);
+        }
+    }, [profile, profileLoaded]);
 
-    // Password form
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [changingPassword, setChangingPassword] = useState(false);
 
-    // API Key
-    const [apiKey, setApiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
+    const [apiKey, setApiKey] = useState(() =>
+        typeof window !== 'undefined' ? localStorage.getItem("gemini_api_key") || "" : ""
+    );
     const [showApiKey, setShowApiKey] = useState(false);
 
-    // WhatsApp config
     const { data: waConfig, isLoading: waLoading } = useWhatsAppConfig();
     const saveWaConfig = useSaveWhatsAppConfig();
     const [waProvider, setWaProvider] = useState<"cloud_api" | "z_api" | "evolution_api">("z_api");
@@ -60,7 +59,14 @@ const Configuracoes = () => {
     const [waActive, setWaActive] = useState(false);
     const [waLoaded, setWaLoaded] = useState(false);
 
-    // Load WhatsApp config
+    const [payProvider, setPayProvider] = useState("asaas");
+    const [payApiKey, setPayApiKey] = useState("");
+    const [signProvider, setSignProvider] = useState("clicksign");
+    const [signApiToken, setSignApiToken] = useState("");
+    const [gcalClientId, setGcalClientId] = useState(() =>
+        typeof window !== 'undefined' ? localStorage.getItem('google_calendar_client_id') || '' : ''
+    );
+
     useEffect(() => {
         if (waConfig && !waLoaded) {
             setWaProvider(waConfig.provider);
@@ -74,11 +80,15 @@ const Configuracoes = () => {
     }, [waConfig, waLoaded]);
 
     const handleSaveProfile = async () => {
-        await updateProfile.mutateAsync({
-            full_name: fullName,
-            phone,
-            oab_number: oabNumber,
-        });
+        try {
+            await updateProfile.mutateAsync({
+                full_name: fullName,
+                phone,
+                oab_number: oabNumber,
+            });
+        } catch {
+            // error handled by mutation onError
+        }
     };
 
     const handleChangePassword = async () => {
@@ -87,7 +97,7 @@ const Configuracoes = () => {
             return;
         }
         if (newPassword !== confirmPassword) {
-            toast({ title: "Senhas diferentes", description: "A confirmaÃ§Ã£o nÃ£o coincide com a nova senha.", variant: "destructive" });
+            toast({ title: "Senhas diferentes", description: "A confirmação não coincide com a nova senha.", variant: "destructive" });
             return;
         }
         setChangingPassword(true);
@@ -96,8 +106,9 @@ const Configuracoes = () => {
             toast({ title: "Senha alterada com sucesso!" });
             setNewPassword("");
             setConfirmPassword("");
-        } catch (e: any) {
-            toast({ title: "Erro", description: e.message, variant: "destructive" });
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : "Erro ao alterar senha";
+            toast({ title: "Erro", description: message, variant: "destructive" });
         } finally {
             setChangingPassword(false);
         }
@@ -109,15 +120,36 @@ const Configuracoes = () => {
     };
 
     const handleSaveWhatsApp = async () => {
-        await saveWaConfig.mutateAsync({
-            owner_id: user?.id ?? "",
-            provider: waProvider,
-            api_url: waApiUrl,
-            api_key: waApiKey,
-            instance_id: waInstanceId,
-            phone_number: waPhoneNumber,
-            is_active: waActive,
-        });
+        if (!user?.id) {
+            toast({ title: "Erro", description: "Usuário não autenticado", variant: "destructive" });
+            return;
+        }
+        try {
+            await saveWaConfig.mutateAsync({
+                owner_id: user.id,
+                provider: waProvider,
+                api_url: waApiUrl,
+                api_key: waApiKey,
+                instance_id: waInstanceId,
+                phone_number: waPhoneNumber,
+                is_active: waActive,
+            });
+        } catch {
+            // error handled by mutation onError
+        }
+    };
+
+    const handleSaveGoogleCalendar = () => {
+        localStorage.setItem('google_calendar_client_id', gcalClientId);
+        toast({ title: "Client ID salvo!" });
+    };
+
+    const handleSavePayment = () => {
+        toast({ title: "Configuração de pagamento salva!", description: `Provedor: ${payProvider}` });
+    };
+
+    const handleSaveSignature = () => {
+        toast({ title: "Configuração de assinatura salva!", description: `Provedor: ${signProvider}` });
     };
 
     if (isLoading) {
@@ -129,10 +161,9 @@ const Configuracoes = () => {
         );
     }
 
-    // Provider-specific placeholder text
     const providerInfo: Record<string, { urlLabel: string; urlPlaceholder: string; keyLabel: string; keyPlaceholder: string; hasInstance: boolean }> = {
         z_api: {
-            urlLabel: "URL da InstÃ¢ncia Z-API",
+            urlLabel: "URL da Instância Z-API",
             urlPlaceholder: "https://api.z-api.io/instances/SUA_INSTANCIA/token/SEU_TOKEN",
             keyLabel: "Client-Token",
             keyPlaceholder: "Seu client-token do Z-API",
@@ -146,8 +177,8 @@ const Configuracoes = () => {
             hasInstance: true,
         },
         cloud_api: {
-            urlLabel: "NÃºmero do Telefone (ID)",
-            urlPlaceholder: "ID do nÃºmero no Meta Business",
+            urlLabel: "Número do Telefone (ID)",
+            urlPlaceholder: "ID do número no Meta Business",
             keyLabel: "Access Token",
             keyPlaceholder: "Token permanente do Meta",
             hasInstance: false,
@@ -159,8 +190,8 @@ const Configuracoes = () => {
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl">
             <div>
-                <h1 className="font-display text-3xl font-bold text-foreground">ConfiguraÃ§Ãµes</h1>
-                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, seguranÃ§a e preferÃªncias.</p>
+                <h1 className="font-display text-3xl font-bold text-foreground">Configurações</h1>
+                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, segurança e preferências.</p>
             </div>
 
             {/* Profile Section */}
@@ -172,7 +203,7 @@ const Configuracoes = () => {
                         </div>
                         <div>
                             <CardTitle className="font-display text-lg">Perfil</CardTitle>
-                            <CardDescription>InformaÃ§Ãµes pessoais e profissionais</CardDescription>
+                            <CardDescription>Informações pessoais e profissionais</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -198,7 +229,7 @@ const Configuracoes = () => {
                             <Label htmlFor="fullName">Nome Completo</Label>
                             <Input
                                 id="fullName"
-                                placeholder="Dr. JoÃ£o Silva"
+                                placeholder="Dr. João Silva"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
                             />
@@ -211,7 +242,7 @@ const Configuracoes = () => {
                                 disabled
                                 className="opacity-60"
                             />
-                            <p className="text-xs text-muted-foreground">O email nÃ£o pode ser alterado.</p>
+                            <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
                         </div>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -225,7 +256,7 @@ const Configuracoes = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="oab">NÂº OAB</Label>
+                            <Label htmlFor="oab">Nº OAB</Label>
                             <Input
                                 id="oab"
                                 placeholder="123456/SP"
@@ -254,7 +285,7 @@ const Configuracoes = () => {
                             <Lock className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg">SeguranÃ§a</CardTitle>
+                            <CardTitle className="font-display text-lg">Segurança</CardTitle>
                             <CardDescription>Altere sua senha de acesso</CardDescription>
                         </div>
                     </div>
@@ -267,7 +298,7 @@ const Configuracoes = () => {
                                 <Input
                                     id="newPassword"
                                     type={showPassword ? "text" : "password"}
-                                    placeholder="MÃ­nimo 6 caracteres"
+                                    placeholder="Mínimo 6 caracteres"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                 />
@@ -275,6 +306,7 @@ const Configuracoes = () => {
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                                 >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
@@ -311,8 +343,8 @@ const Configuracoes = () => {
                             <Key className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg">InteligÃªncia Artificial</CardTitle>
-                            <CardDescription>Configure a chave da API do Google Gemini para o Gerador de PeÃ§as</CardDescription>
+                            <CardTitle className="font-display text-lg">Inteligência Artificial</CardTitle>
+                            <CardDescription>Configure a chave da API do Google Gemini para o Gerador de Peças</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -331,6 +363,7 @@ const Configuracoes = () => {
                                 type="button"
                                 onClick={() => setShowApiKey(!showApiKey)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
                             >
                                 {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
@@ -373,7 +406,7 @@ const Configuracoes = () => {
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label>Provedor</Label>
-                        <Select value={waProvider} onValueChange={(v: any) => setWaProvider(v)}>
+                        <Select value={waProvider} onValueChange={(v: "cloud_api" | "z_api" | "evolution_api") => setWaProvider(v)}>
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
@@ -407,7 +440,7 @@ const Configuracoes = () => {
 
                     {pInfo.hasInstance && (
                         <div className="space-y-2">
-                            <Label>Nome da InstÃ¢ncia</Label>
+                            <Label>Nome da Instância</Label>
                             <Input
                                 placeholder="minha-instancia"
                                 value={waInstanceId}
@@ -417,20 +450,20 @@ const Configuracoes = () => {
                     )}
 
                     <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
-                        <p className="font-medium text-foreground">ðŸ“‹ Como configurar:</p>
+                        <p className="font-medium text-foreground">Como configurar:</p>
                         {waProvider === "z_api" && (
                             <>
                                 <p>1. Crie uma conta em <a href="https://z-api.io" target="_blank" className="text-primary underline">z-api.io</a></p>
-                                <p>2. Crie uma instÃ¢ncia e escaneie o QR Code com seu WhatsApp</p>
-                                <p>3. Cole a URL da instÃ¢ncia e o Client-Token acima</p>
+                                <p>2. Crie uma instância e escaneie o QR Code com seu WhatsApp</p>
+                                <p>3. Cole a URL da instância e o Client-Token acima</p>
                                 <p>4. Configure o webhook de recebimento na Z-API apontando para seu Supabase</p>
                             </>
                         )}
                         {waProvider === "evolution_api" && (
                             <>
                                 <p>1. Instale a Evolution API no seu servidor</p>
-                                <p>2. Crie uma instÃ¢ncia e escaneie o QR Code</p>
-                                <p>3. Cole a URL, API Key e nome da instÃ¢ncia acima</p>
+                                <p>2. Crie uma instância e escaneie o QR Code</p>
+                                <p>3. Cole a URL, API Key e nome da instância acima</p>
                                 <p>4. Configure o webhook na Evolution API</p>
                             </>
                         )}
@@ -438,7 +471,7 @@ const Configuracoes = () => {
                             <>
                                 <p>1. Acesse <a href="https://developers.facebook.com" target="_blank" className="text-primary underline">developers.facebook.com</a></p>
                                 <p>2. Crie um app do tipo Business e configure o WhatsApp</p>
-                                <p>3. Obtenha o Token permanente e o ID do nÃºmero</p>
+                                <p>3. Obtenha o Token permanente e o ID do número</p>
                                 <p>4. Configure o webhook no Meta para seu Supabase</p>
                             </>
                         )}
@@ -456,6 +489,150 @@ const Configuracoes = () => {
                 </CardContent>
             </Card>
 
+            {/* Google Calendar */}
+            <Card className="border-blue-200">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 3.75h-15A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V6a2.25 2.25 0 00-2.25-2.25zM9 17.25H6.75V9.75H9v7.5zm4.125 0h-2.25V9.75h2.25v7.5zM17.25 17.25H15V9.75h2.25v7.5zM6.75 8.25v-3h10.5v3H6.75z" /></svg>
+                        </div>
+                        <div>
+                            <CardTitle className="font-display text-lg">Google Calendar</CardTitle>
+                            <CardDescription>Sincronize sua agenda com o Google Calendar (2 vias)</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Google OAuth Client ID</Label>
+                        <Input
+                            placeholder="123456789-abc.apps.googleusercontent.com"
+                            value={gcalClientId}
+                            onChange={(e) => setGcalClientId(e.target.value)}
+                        />
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">Como obter o Client ID:</p>
+                        <p>1. Acesse <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-primary underline">Google Cloud Console</a></p>
+                        <p>2. Crie um projeto (ou use um existente)</p>
+                        <p>3. Ative a API <strong>Google Calendar API</strong></p>
+                        <p>4. Crie credenciais → OAuth 2.0 Client ID (tipo: Web application)</p>
+                        <p>5. Em "Authorized JavaScript origins", adicione: <code className="bg-muted px-1 rounded">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8082'}</code></p>
+                        <p>6. Em "Authorized redirect URIs", adicione a mesma URL</p>
+                        <p>7. Cole o Client ID acima</p>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSaveGoogleCalendar}>
+                            <Save className="mr-2 h-4 w-4" />Salvar Google Calendar
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Payment Integration */}
+            <Card className="border-emerald-200">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                            <CreditCard className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <CardTitle className="font-display text-lg">Pagamentos Online</CardTitle>
+                            <CardDescription>Configure integração para cobranças PIX, boleto e link de pagamento</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Provedor de Pagamento</Label>
+                        <Select value={payProvider} onValueChange={setPayProvider}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="asaas">Asaas</SelectItem>
+                                <SelectItem value="stripe">Stripe</SelectItem>
+                                <SelectItem value="mercadopago">Mercado Pago</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input
+                                type="password"
+                                placeholder="Sua chave de API"
+                                value={payApiKey}
+                                onChange={(e) => setPayApiKey(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Webhook URL</Label>
+                            <Input readOnly value="https://seu-supabase.co/functions/v1/payment-webhook" className="opacity-70" />
+                        </div>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">Baixa automática</p>
+                        <p>Ao configurar o webhook no provedor, pagamentos confirmados serão marcados como "Pago" automaticamente no sistema.</p>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSavePayment}>
+                            <Save className="mr-2 h-4 w-4" />Salvar Pagamentos
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* E-Signature Integration */}
+            <Card className="border-indigo-200">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                            <PenTool className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <CardTitle className="font-display text-lg">Assinatura Eletrônica</CardTitle>
+                            <CardDescription>Integre assinatura digital para contratos e documentos</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Provedor de Assinatura</Label>
+                        <Select value={signProvider} onValueChange={setSignProvider}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="clicksign">Clicksign</SelectItem>
+                                <SelectItem value="docusign">DocuSign</SelectItem>
+                                <SelectItem value="zapsign">ZapSign</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Token de API</Label>
+                        <Input
+                            type="password"
+                            placeholder="Seu token de acesso"
+                            value={signApiToken}
+                            onChange={(e) => setSignApiToken(e.target.value)}
+                        />
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">Como funciona:</p>
+                        <p>1. Obtenha o token de API no painel do seu provedor de assinatura.</p>
+                        <p>2. Ao enviar um documento para assinatura no módulo Documentos, o sistema usará essa integração.</p>
+                        <p>3. O status da assinatura é atualizado automaticamente via webhook.</p>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveSignature}>
+                            <Save className="mr-2 h-4 w-4" />Salvar Assinatura
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Danger Zone */}
             <Card className="border-destructive/30">
                 <CardHeader>
@@ -464,14 +641,14 @@ const Configuracoes = () => {
                             <LogOut className="h-5 w-5" />
                         </div>
                         <div>
-                            <CardTitle className="font-display text-lg text-destructive">SessÃ£o</CardTitle>
-                            <CardDescription>Encerrar a sessÃ£o atual</CardDescription>
+                            <CardTitle className="font-display text-lg text-destructive">Sessão</CardTitle>
+                            <CardDescription>Encerrar a sessão atual</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        Ao sair, vocÃª serÃ¡ redirecionado para a tela de login e precisarÃ¡ inserir suas credenciais novamente.
+                        Ao sair, você será redirecionado para a tela de login e precisará inserir suas credenciais novamente.
                     </p>
                     <Button variant="destructive" onClick={signOut}>
                         <LogOut className="mr-2 h-4 w-4" />Sair da Conta

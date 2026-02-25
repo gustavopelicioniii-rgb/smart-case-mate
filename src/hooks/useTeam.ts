@@ -20,6 +20,13 @@ export interface UserPermission {
     can_edit: boolean;
 }
 
+function generateSecurePassword(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array, (b) => chars[b % chars.length]).join('');
+}
+
 export function useTeamMembers() {
     return useQuery<TeamMember[]>({
         queryKey: ['team-members'],
@@ -31,6 +38,7 @@ export function useTeamMembers() {
             if (error) throw error;
             return data as TeamMember[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -46,6 +54,7 @@ export function useUserPermissions(userId: string) {
             return data as UserPermission[];
         },
         enabled: !!userId,
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -85,7 +94,6 @@ export function useUpdatePermission() {
             can_view: boolean;
             can_edit: boolean;
         }) => {
-            // Upsert the permission
             const { error } = await supabase
                 .from('user_permissions')
                 .upsert(
@@ -108,12 +116,10 @@ export function useInviteUser() {
     const { toast } = useToast();
     return useMutation({
         mutationFn: async ({ email, fullName }: { email: string; fullName: string }) => {
-            // 1. Save current admin session
             const { data: { session: adminSession } } = await supabase.auth.getSession();
             if (!adminSession) throw new Error('Você precisa estar logado');
 
-            // 2. Create the new user with fixed temp password
-            const tempPassword = 'senha123';
+            const tempPassword = generateSecurePassword();
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password: tempPassword,
@@ -123,7 +129,6 @@ export function useInviteUser() {
             });
             if (error) throw error;
 
-            // 3. Restore admin session (signUp may have changed the active session)
             await supabase.auth.setSession({
                 access_token: adminSession.access_token,
                 refresh_token: adminSession.refresh_token,
@@ -134,9 +139,9 @@ export function useInviteUser() {
         onSuccess: (result) => {
             qc.invalidateQueries({ queryKey: ['team-members'] });
             toast({
-                title: 'Membro criado com sucesso!',
-                description: `Email: ${result.email} — Senha temporária: ${result.tempPassword}`,
-                duration: 15000,
+                title: 'Membro convidado com sucesso!',
+                description: `Um email foi enviado para ${result.email} com as instruções de acesso.`,
+                duration: 8000,
             });
         },
         onError: (e: Error) => {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -33,25 +34,31 @@ export function useProcessos() {
             const { data, error } = await supabase
                 .from('processos')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(0, 499);
 
             if (error) throw error;
             return data as Processo[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
 export function useProcessoStats() {
     const { data: processos } = useProcessos();
-
-    const stats = {
-        total: processos?.length ?? 0,
-        emAndamento: processos?.filter(p => p.status === 'Em andamento').length ?? 0,
-        aguardandoPrazo: processos?.filter(p => p.status === 'Aguardando prazo').length ?? 0,
-        concluidos: processos?.filter(p => p.status === 'Concluído').length ?? 0,
-    };
-
-    return stats;
+    return useMemo(() => {
+        const stats = (processos ?? []).reduce(
+            (acc, p) => {
+                acc.total++;
+                if (p.status === 'Em andamento') acc.emAndamento++;
+                else if (p.status === 'Aguardando prazo') acc.aguardandoPrazo++;
+                else if (p.status === 'Concluído') acc.concluidos++;
+                return acc;
+            },
+            { total: 0, emAndamento: 0, aguardandoPrazo: 0, concluidos: 0 }
+        );
+        return stats;
+    }, [processos]);
 }
 
 export function useCreateProcesso() {

@@ -1,4 +1,6 @@
-import { Clock, ArrowUpRight, DollarSign } from "lucide-react";
+import { useMemo } from "react";
+import { Clock, ArrowUpRight, DollarSign, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,93 +10,165 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-interface Deadline {
-  process: string;
-  client: string;
-  deadline: string;
-  type: string;
-  daysLeft: number;
-  urgent: boolean;
-  financialImpact: string;
-}
-
-const deadlines: Deadline[] = [
-  { process: "Proc. 0012345-67.2024.8.26.0100", client: "Maria Silva", deadline: "23 Fev 2026", type: "Contestação", daysLeft: 1, urgent: true, financialImpact: "R$ 8.000" },
-  { process: "Proc. 0098765-43.2024.5.02.0001", client: "João Santos", deadline: "25 Fev 2026", type: "Recurso Ordinário", daysLeft: 3, urgent: true, financialImpact: "R$ 12.500" },
-  { process: "Proc. 1234567-89.2025.8.26.0100", client: "Empresa ABC Ltda", deadline: "28 Fev 2026", type: "Réplica", daysLeft: 6, urgent: false, financialImpact: "R$ 25.000" },
-  { process: "Proc. 0054321-12.2025.8.26.0100", client: "Carlos Oliveira", deadline: "05 Mar 2026", type: "Petição Inicial", daysLeft: 11, urgent: false, financialImpact: "R$ 5.000" },
-];
+import { useDeadlines, useHolidays, businessDaysBetween } from "@/hooks/useDeadlines";
+import { useProcessos } from "@/hooks/useProcessos";
+import { format, parseISO, startOfDay, isBefore, isSameDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const getDaysLeftColor = (days: number) => {
+  if (days <= 0) return "text-destructive font-bold";
   if (days <= 2) return "text-destructive font-bold";
-  if (days <= 5) return "text-warning font-semibold";
+  if (days <= 5) return "text-amber-600 dark:text-amber-500 font-semibold";
   return "text-muted-foreground";
 };
 
 const getDaysLeftBg = (days: number) => {
+  if (days <= 0) return "bg-destructive/15 border-destructive/50 animate-pulse";
   if (days <= 2) return "bg-destructive/10 border-destructive/30 animate-pulse";
-  if (days <= 5) return "bg-warning/5 border-warning/20";
+  if (days <= 5) return "bg-amber-500/5 border-amber-500/20";
   return "bg-card border-border";
 };
 
-const CriticalDeadlines = () => (
-  <TooltipProvider>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="font-display text-xl flex items-center gap-2">
-          🔴 Prazos Críticos
-        </CardTitle>
-        <Button variant="ghost" size="sm">
-          Ver todos <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        {deadlines.map((d, i) => (
-          <Tooltip key={i}>
-            <TooltipTrigger asChild>
-              <div
-                className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:scale-[1.005] cursor-pointer ${getDaysLeftBg(d.daysLeft)}`}
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                      d.urgent ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{d.client}</p>
-                    <p className="text-xs text-muted-foreground truncate">{d.process}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="hidden sm:flex items-center gap-1.5 rounded-md bg-accent/10 px-2.5 py-1.5">
-                    <DollarSign className="h-3.5 w-3.5 text-accent" />
-                    <span className="text-xs font-bold text-accent">{d.financialImpact}</span>
-                  </div>
-                  <Badge variant={d.urgent ? "destructive" : "secondary"}>{d.type}</Badge>
-                  <div className="text-right">
-                    <p className={`text-sm ${getDaysLeftColor(d.daysLeft)}`}>
-                      {d.daysLeft === 1 ? "AMANHÃ" : `${d.daysLeft} dias`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{d.deadline}</p>
-                  </div>
-                </div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="max-w-xs">
-              <p className="font-semibold">{d.client} – {d.type}</p>
-              <p className="text-xs mt-1">{d.process}</p>
-              <p className="text-xs mt-1">Prazo: {d.deadline} ({d.daysLeft} dias restantes)</p>
-              <p className="text-xs mt-1 font-semibold">💰 Honorários vinculados: {d.financialImpact}</p>
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </CardContent>
-    </Card>
-  </TooltipProvider>
-);
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+};
+
+const CriticalDeadlines = () => {
+  const { data: deadlines, isLoading } = useDeadlines();
+  const { data: processos } = useProcessos();
+  const { data: holidays = [] } = useHolidays();
+  const today = new Date();
+  const holidayDates = useMemo(() => holidays.map((h) => h.data), [holidays]);
+  const todayStart = startOfDay(today);
+
+  const activeDeadlines = useMemo(() => {
+    const fromTable = (deadlines ?? []).filter((d) => d.status === 'Pendente' && d.data_fim);
+    const fromProcessos = (processos ?? [])
+      .filter((p) => {
+        if (!p.next_deadline || p.status === 'Concluído') return false;
+        try {
+          const d = parseISO(p.next_deadline);
+          return !isNaN(d.getTime()) && !isBefore(d, todayStart);
+        } catch {
+          return false;
+        }
+      })
+      .map((p) => ({
+        id: `proc-${p.id}`,
+        process_id: p.id,
+        titulo: 'Próximo prazo',
+        data_fim: p.next_deadline!,
+        process: { number: p.number, client: p.client, value: p.value ?? 0 },
+      }));
+    const combined = [...fromTable, ...fromProcessos]
+      .map((d) => {
+        try {
+          const dateFim = parseISO(d.data_fim);
+          if (isNaN(dateFim.getTime())) return null;
+          const isVencido = isBefore(dateFim, todayStart);
+          const venceHoje = !isVencido && isSameDay(dateFim, today);
+          const diasUteisRestantes = isVencido ? -1 : venceHoje ? 0 : businessDaysBetween(today, dateFim, holidayDates);
+          return { ...d, dateFim, diasUteisRestantes, isVencido, venceHoje };
+        } catch {
+          return null;
+        }
+      })
+      .filter((d): d is NonNullable<typeof d> => d != null)
+      .sort((a, b) => a.diasUteisRestantes - b.diasUteisRestantes)
+      .slice(0, 6);
+    return combined;
+  }, [deadlines, processos, holidayDates]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-10">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <CardTitle className="font-display text-xl flex items-center gap-2">
+            🔴 Prazos processuais
+          </CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/processos">
+              Ver todos <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          <p className="text-xs text-muted-foreground mb-2">
+            Contagem em dias úteis (feriados forenses descontados). Alerta antes do vencimento.
+          </p>
+          {activeDeadlines.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhum prazo pendente para os próximos dias.
+            </div>
+          ) : (
+            activeDeadlines.map((d) => {
+              const dateFim = d.dateFim;
+              const daysLeft = d.diasUteisRestantes;
+              const isUrgent = daysLeft <= 3 || d.isVencido;
+
+              return (
+                <Tooltip key={d.id}>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:scale-[1.005] cursor-pointer ${getDaysLeftBg(daysLeft)}`}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isUrgent ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                            }`}
+                        >
+                          <Clock className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{d.process?.client || "Cliente não informado"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{d.process?.number || "Processo s/n"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        {d.process?.value > 0 && (
+                          <div className="hidden sm:flex items-center gap-1.5 rounded-md bg-accent/10 px-2.5 py-1.5">
+                            <DollarSign className="h-3.5 w-3.5 text-accent" />
+                            <span className="text-xs font-bold text-accent">{formatCurrency(d.process.value)}</span>
+                          </div>
+                        )}
+                        <Badge variant={isUrgent ? "destructive" : "secondary"}>{d.titulo}</Badge>
+                        <div className="text-right">
+                          <p className={`text-sm ${getDaysLeftColor(daysLeft)}`}>
+                            {d.isVencido ? "VENCIDO" : d.venceHoje || daysLeft === 0 ? "VENCE HOJE" : daysLeft === 1 ? "1 dia útil" : `${daysLeft} dias úteis`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(dateFim, "dd MMM yyyy", { locale: ptBR })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="font-semibold">{d.process?.client} – {d.titulo}</p>
+                    <p className="text-xs mt-1">Nº {d.process?.number}</p>
+                    <p className="text-xs mt-1">Prazo: {format(dateFim, "dd/MM/yyyy")} {d.isVencido ? "(vencido)" : `(${daysLeft} dias úteis restantes)`}</p>
+                    {d.process?.value > 0 && (
+                      <p className="text-xs mt-1 font-semibold">💰 Honorários vinculados: {formatCurrency(d.process.value)}</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+    </TooltipProvider>
+  );
+};
 
 export default CriticalDeadlines;

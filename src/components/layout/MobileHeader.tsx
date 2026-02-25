@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Scale, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const MobileHeader = () => {
     const { user } = useAuth();
@@ -15,12 +16,15 @@ const MobileHeader = () => {
                     Advogado<span className="text-sidebar-primary">10X</span>
                 </h1>
             </div>
-            <Link
-                to="/configuracoes"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent/50 text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors"
-            >
-                <User className="h-5 w-5" />
-            </Link>
+            <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <Link
+                    to="/configuracoes"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent/50 text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors"
+                >
+                    <User className="h-5 w-5" />
+                </Link>
+            </div>
         </header>
     );
 };

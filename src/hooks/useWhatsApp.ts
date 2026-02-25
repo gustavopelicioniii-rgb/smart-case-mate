@@ -50,6 +50,7 @@ export function useWhatsAppConfig() {
             if (error) throw error;
             return data as WhatsAppConfig | null;
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -85,7 +86,8 @@ export function useWhatsAppMessages(contactPhone?: string) {
             let query = supabase
                 .from('whatsapp_messages')
                 .select('*')
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: true })
+                .range(0, 199);
             if (contactPhone) {
                 query = query.eq('contact_phone', contactPhone);
             }
@@ -93,7 +95,7 @@ export function useWhatsAppMessages(contactPhone?: string) {
             if (error) throw error;
             return data as WhatsAppMessage[];
         },
-        enabled: !contactPhone || contactPhone.length > 0,
+        enabled: !!contactPhone,
     });
 }
 
@@ -105,7 +107,8 @@ export function useConversations() {
             const { data, error } = await supabase
                 .from('whatsapp_messages')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(0, 999);
             if (error) throw error;
 
             const messages = data as WhatsAppMessage[];
@@ -197,7 +200,7 @@ export function useSendWhatsAppMessage() {
             }
 
             // 3. Save outgoing message to DB
-            await supabase.from('whatsapp_messages').insert({
+            const { error: dbError } = await supabase.from('whatsapp_messages').insert({
                 owner_id: user.id,
                 contact_phone: phone,
                 contact_name: '',
@@ -205,6 +208,7 @@ export function useSendWhatsAppMessage() {
                 direction: 'outgoing',
                 status: sent ? 'sent' : 'failed',
             });
+            if (dbError) throw dbError;
 
             if (!sent) throw new Error('Falha ao enviar mensagem');
         },

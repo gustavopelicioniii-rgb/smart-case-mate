@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -26,19 +27,42 @@ export function useFees() {
             const { data, error } = await supabase
                 .from('fees')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(0, 499);
             if (error) throw error;
             return data as Fee[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
 export function useFeeStats() {
     const { data: fees } = useFees();
-    const pago = fees?.filter(f => f.status === 'Pago').reduce((sum, f) => sum + Number(f.value), 0) ?? 0;
-    const pendente = fees?.filter(f => f.status === 'Pendente').reduce((sum, f) => sum + Number(f.value), 0) ?? 0;
-    const atrasado = fees?.filter(f => f.status === 'Atrasado').reduce((sum, f) => sum + Number(f.value), 0) ?? 0;
-    return { total: pago + pendente + atrasado, pago, pendente, atrasado };
+    return useMemo(() => {
+        const stats = (fees ?? []).reduce(
+            (acc, f) => {
+                const v = Number(f.value);
+                if (f.status === 'Pago') {
+                    acc.pago += v;
+                    acc.countPago++;
+                } else if (f.status === 'Pendente') {
+                    acc.pendente += v;
+                    acc.countPendente++;
+                } else if (f.status === 'Atrasado') {
+                    acc.atrasado += v;
+                    acc.countAtrasado++;
+                }
+                return acc;
+            },
+            { pago: 0, pendente: 0, atrasado: 0, countPago: 0, countPendente: 0, countAtrasado: 0 }
+        );
+        const total = stats.pago + stats.pendente + stats.atrasado;
+        return {
+            total,
+            ...stats,
+            countPendenteOuAtrasado: stats.countPendente + stats.countAtrasado,
+        };
+    }, [fees]);
 }
 
 export function useCreateFee() {

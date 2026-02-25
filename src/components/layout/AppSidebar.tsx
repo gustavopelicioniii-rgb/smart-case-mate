@@ -18,21 +18,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { mockEvents } from "@/data/mockMeetings";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useMemo } from "react";
+import { format } from "date-fns";
 
-// Count today's meetings for badge
-const todayCount = mockEvents.filter((e) => {
-  const today = new Date();
-  const d = new Date(e.data);
-  return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-}).length;
-
-const mainNav = [
+const mainNavItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Processos", href: "/processos", icon: Scale },
-  { name: "Agenda", href: "/agenda", icon: Calendar, count: todayCount },
+  { name: "Agenda", href: "/agenda", icon: Calendar, useCount: true },
   { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true },
   { name: "CRM", href: "/crm", icon: Users },
   { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
@@ -46,6 +42,16 @@ const secondaryNav = [
   { name: "Equipe", href: "/equipe", icon: UsersRound },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
+
+function getMainNav(todayCount: number) {
+  return mainNavItems.map((item) => {
+    if ("useCount" in item && item.useCount) {
+      const { useCount, ...rest } = item;
+      return { ...rest, count: todayCount };
+    }
+    return item;
+  });
+}
 
 const NavItem = ({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType; badge?: boolean; count?: number }; isActive: boolean }) => (
   <Link
@@ -74,6 +80,17 @@ const AppSidebar = () => {
   const location = useLocation();
   const { user, role, signOut } = useAuth();
   const { data: profile } = useProfile();
+  const { events: gcalEvents } = useGoogleCalendar();
+  const todayCount = useMemo(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    return (gcalEvents ?? []).filter((e) => {
+      const start = e.start?.dateTime || e.start?.date;
+      if (!start) return false;
+      const d = new Date(start);
+      return format(d, "yyyy-MM-dd") === todayStr;
+    }).length;
+  }, [gcalEvents]);
+  const mainNav = getMainNav(todayCount);
   const isActive = (href: string) =>
     href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
 
@@ -116,6 +133,10 @@ const AppSidebar = () => {
           {secondaryNav.map((item) => (
             <NavItem key={item.name} item={item} isActive={isActive(item.href)} />
           ))}
+        </div>
+
+        <div className="px-3 pt-2">
+          <ThemeToggle />
         </div>
       </nav>
 

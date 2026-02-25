@@ -42,6 +42,7 @@ export function useCrmStages() {
             if (error) throw error;
             return data as CrmStage[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -96,6 +97,7 @@ export function useCrmClients() {
             if (error) throw error;
             return data as CrmClient[];
         },
+        staleTime: 5 * 60 * 1000,
     });
 }
 

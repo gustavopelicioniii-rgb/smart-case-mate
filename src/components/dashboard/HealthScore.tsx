@@ -10,9 +10,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+export interface BreakdownItem {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  percent: number;
+  status: "good" | "warning" | "bad";
+  suggestion: string;
+}
+
 interface HealthScoreProps {
   score: number;
   label: string;
+  breakdownItems?: BreakdownItem[];
 }
 
 const getScoreColor = (score: number) => {
@@ -27,20 +37,11 @@ const getScoreEmoji = (score: number) => {
   return "🔴";
 };
 
-interface BreakdownItem {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  percent: number;
-  status: "good" | "warning" | "bad";
-  suggestion: string;
-}
-
-const breakdownItems: BreakdownItem[] = [
-  { icon: CheckCircle2, label: "Prazos organizados", value: "90%", percent: 90, status: "good", suggestion: "Excelente! Continue monitorando diariamente." },
-  { icon: AlertTriangle, label: "Honorários em risco", value: "3 pendentes", percent: 35, status: "warning", suggestion: "Automatize cobranças para reduzir inadimplência." },
-  { icon: TrendingDown, label: "Processos ativos sem pausa", value: "92%", percent: 92, status: "good", suggestion: "Apenas 2 processos sem movimentação recente." },
-  { icon: DollarSign, label: "Receita projetada", value: "Positiva", percent: 75, status: "good", suggestion: "Pipeline saudável. Foque em converter 4 leads pendentes." },
+const defaultBreakdown: BreakdownItem[] = [
+  { icon: CheckCircle2, label: "Prazos", value: "—", percent: 0, status: "good", suggestion: "Dados de prazos carregando." },
+  { icon: AlertTriangle, label: "Honorários", value: "—", percent: 0, status: "good", suggestion: "Dados de honorários carregando." },
+  { icon: TrendingDown, label: "Processos ativos", value: "—", percent: 0, status: "good", suggestion: "Dados de processos carregando." },
+  { icon: DollarSign, label: "Receita", value: "—", percent: 0, status: "good", suggestion: "Dados de receita carregando." },
 ];
 
 const statusStyles = {
@@ -55,7 +56,7 @@ const statusBarColor = {
   bad: "bg-destructive",
 };
 
-const HealthScore = ({ score, label }: HealthScoreProps) => {
+const HealthScore = ({ score, label, breakdownItems = defaultBreakdown }: HealthScoreProps) => {
   const [expanded, setExpanded] = useState(false);
   const colors = getScoreColor(score);
 

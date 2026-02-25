@@ -1,10 +1,8 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
 import {
   FileText, Loader2, Sparkles, Save, Copy, Trash2, Clock,
-  ChevronDown, Settings2,
+  ChevronDown, Settings2, Brain, Wand2, ChevronLeft,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,31 +19,26 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePecas, useSavePeca, useDeletePeca, generateWithGemini } from "@/hooks/usePecas";
+import { useProcessos } from "@/hooks/useProcessos";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-
-const TIPOS_PECA = [
-  "Petição Inicial",
-  "Contestação",
-  "Réplica",
-  "Recurso de Apelação",
-  "Agravo de Instrumento",
-  "Embargos de Declaração",
-  "Habeas Corpus",
-  "Mandado de Segurança",
-  "Parecer Jurídico",
-  "Contrato",
-  "Outro",
-];
+import PecaTemplates, { type PecaTemplate, pecaTemplates } from "@/components/pecas/PecaTemplates";
+import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useState } from "react";
 
 const Pecas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { data: pecas, isLoading } = usePecas();
+  const { data: pecas, isLoading: isLoadingPecas } = usePecas();
+  const { data: processos } = useProcessos();
   const saveMutation = useSavePeca();
   const deleteMutation = useDeletePeca();
 
   // Form state
+  const [selectedTemplate, setSelectedTemplate] = useState<PecaTemplate | null>(null);
+  const [selectedProcessId, setSelectedProcessId] = useState<string>("");
   const [tipo, setTipo] = useState("Petição Inicial");
   const [processNumber, setProcessNumber] = useState("");
   const [context, setContext] = useState("");
@@ -62,6 +55,18 @@ const Pecas = () => {
     localStorage.setItem("gemini_api_key", key);
   };
 
+  const handleSelectTemplate = (template: PecaTemplate) => {
+    setSelectedTemplate(template);
+    setTipo(template.titulo);
+  };
+
+  const handleBackToTemplates = () => {
+    setSelectedTemplate(null);
+    setGeneratedText("");
+  };
+
+  const selectedProcess = processos?.find(p => p.id === selectedProcessId);
+
   const handleGenerate = async () => {
     if (!apiKey) {
       toast({ title: "Chave de API necessária", description: "Configure sua chave da API Gemini nas configurações.", variant: "destructive" });
@@ -75,12 +80,25 @@ const Pecas = () => {
 
     setIsGenerating(true);
     try {
+      let finalContext = context;
+      if (selectedProcess) {
+        finalContext = `
+DADOS DO PROCESSO:
+Processo nº: ${selectedProcess.number}
+Cliente: ${selectedProcess.client}
+Tribunal: ${selectedProcess.court}
+Polo Ativo: ${selectedProcess.active_party || selectedProcess.client}
+Polo Passivo: ${selectedProcess.passive_party}
+---
+FATOS E CONTEXTO ADICIONAL:
+${context}`;
+      }
+
       const prompt = `Você é um advogado brasileiro sênior especializado.
-Gere uma peça jurídica do tipo: "${tipo}".
-${processNumber ? `Número do processo: ${processNumber}` : ""}
+${selectedTemplate ? selectedTemplate.promptBase : `Gere uma peça jurídica do tipo: "${tipo}".`}
 
 CONTEXTO DO CASO:
-${context}
+${finalContext}
 
 INSTRUÇÕES:
 1. Gere a peça completa, pronta para uso, em formato profissional.
@@ -107,7 +125,7 @@ INSTRUÇÕES:
       tipo,
       context,
       generated_text: generatedText,
-      process_number: processNumber,
+      process_number: selectedProcess?.number || processNumber,
       owner_id: user?.id ?? null,
     });
   };
@@ -117,154 +135,164 @@ INSTRUÇÕES:
     toast({ title: "Copiado para a área de transferência!" });
   };
 
-  const loadPeca = (peca: typeof pecas extends (infer T)[] | undefined ? T : never) => {
+  const loadPeca = (peca: any) => {
     setTitle(peca.title);
     setTipo(peca.tipo);
     setContext(peca.context);
     setGeneratedText(peca.generated_text);
     setProcessNumber(peca.process_number);
     setHistoryOpen(false);
+    // Tenta encontrar o template correspondente ou define um genérico
+    const template = pecaTemplates.find(t => t.titulo === peca.tipo);
+    if (template) setSelectedTemplate(template);
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-foreground">Gerador de Peças</h1>
-          <p className="mt-1 text-muted-foreground">
-            Gere peças jurídicas com inteligência artificial (Google Gemini).
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {selectedTemplate && (
+            <Button variant="ghost" size="icon" onClick={handleBackToTemplates}>
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">Gerador de Peças (IA)</h1>
+            <p className="mt-1 text-muted-foreground">
+              {selectedTemplate ? `Redigindo: ${selectedTemplate.titulo}` : "Selecione um modelo para começar a peticionar com IA."}
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
             <Settings2 className="mr-2 h-4 w-4" />API
           </Button>
           <Button variant="outline" size="sm" onClick={() => setHistoryOpen(!historyOpen)}>
-            <Clock className="mr-2 h-4 w-4" />Histórico
+            <Clock className="mr-2 h-4 w-4" />Peças Salvas
           </Button>
         </div>
       </div>
 
-      {/* API Key Settings */}
-      {showSettings && (
-        <Card className="border-accent/30 bg-accent/5">
-          <CardContent className="p-4">
-            <div className="flex items-end gap-3">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="apiKey">Chave da API Google Gemini</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="AIza..."
-                  value={apiKey}
-                  onChange={(e) => saveApiKey(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Obtenha em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">aistudio.google.com/apikey</a>. Sua chave fica salva apenas no seu navegador.
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setShowSettings(false)}>Fechar</Button>
+      <AnimatePresence mode="wait">
+        {!selectedTemplate ? (
+          <motion.div
+            key="templates"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <PecaTemplates onSelect={handleSelectTemplate} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="generator"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="grid gap-6 lg:grid-cols-2"
+          >
+            {/* Left: Input */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-accent" />Configurar Peça
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Vincular a Processo (Opcional)</Label>
+                    <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um processo cadastrado..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {processos?.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.number} — {p.client}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="context">Fatos e Contexto do Caso *</Label>
+                    <Textarea
+                      id="context"
+                      placeholder="Descreva detalhadamente o caso..."
+                      value={context}
+                      onChange={(e) => setContext(e.target.value)}
+                      className="min-h-[300px] resize-none p-4"
+                    />
+                  </div>
+                  <Button className="w-full" size="lg" onClick={handleGenerate} disabled={isGenerating}>
+                    {isGenerating ? (
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" />A IA está redigindo...</>
+                    ) : (
+                      <><Wand2 className="mr-2 h-5 w-5" />Gerar Peça Completa</>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left: Input */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-accent" />Configurar Peça
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo da Peça</Label>
-                  <Select value={tipo} onValueChange={setTipo}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TIPOS_PECA.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="processNum">Nº do Processo</Label>
-                  <Input
-                    id="processNum"
-                    placeholder="0012345-67.2024"
-                    value={processNumber}
-                    onChange={(e) => setProcessNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="context">Contexto do Caso *</Label>
-                <Textarea
-                  id="context"
-                  placeholder="Descreva os fatos, a situação do cliente, as partes envolvidas e o resultado esperado. Quanto mais detalhes, melhor será a peça gerada..."
-                  value={context}
-                  onChange={(e) => setContext(e.target.value)}
-                  rows={8}
-                  className="resize-y"
-                />
-              </div>
-              <Button className="w-full" size="lg" onClick={handleGenerate} disabled={isGenerating}>
-                {isGenerating ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Gerando com IA...</>
-                ) : (
-                  <><Sparkles className="mr-2 h-5 w-5" />Gerar Peça</>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right: Output */}
-        <div className="space-y-4">
-          <Card className="min-h-[400px]">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />Peça Gerada
-              </CardTitle>
-              {generatedText && (
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={handleCopy}>
-                    <Copy className="mr-1 h-3.5 w-3.5" />Copiar
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                    <Save className="mr-1 h-3.5 w-3.5" />Salvar
-                  </Button>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent>
-              {isGenerating ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-accent" />
-                  <p className="mt-4 text-sm text-muted-foreground">A IA está redigindo sua peça...</p>
-                  <p className="text-xs text-muted-foreground">Isso pode levar alguns segundos.</p>
-                </div>
-              ) : generatedText ? (
-                <Textarea
-                  className="min-h-[400px] font-mono text-sm resize-y whitespace-pre-wrap"
-                  value={generatedText}
-                  onChange={(e) => setGeneratedText(e.target.value)}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                  <Sparkles className="h-12 w-12 mb-4 opacity-30" />
-                  <p className="text-sm">Preencha o contexto e clique em "Gerar Peça".</p>
-                  <p className="text-xs mt-1">A peça aparecerá aqui e poderá ser editada antes de salvar.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            {/* Right: Output */}
+            <div className="space-y-4">
+              <Card className="min-h-[500px] flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                  <CardTitle className="font-display text-lg flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />Rascunho da Peça
+                  </CardTitle>
+                  {generatedText && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={handleCopy}>
+                        <Copy className="mr-2 h-3.5 w-3.5" />Copiar
+                      </Button>
+                      <Button variant="default" size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
+                        <Save className="mr-2 h-3.5 w-3.5" />Salvar
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="flex-1 p-0">
+                  {isGenerating ? (
+                    <div className="flex flex-col items-center justify-center h-full py-20 text-center">
+                      <Loader2 className="h-10 w-10 animate-spin text-accent" />
+                      <p className="mt-4 text-sm font-medium">A IA está processando sua petição...</p>
+                      <p className="text-xs text-muted-foreground">Consultando bases jurídicas e estruturando fatos.</p>
+                    </div>
+                  ) : generatedText ? (
+                    <div className="flex flex-col h-full">
+                      <Textarea
+                        className="flex-1 min-h-[450px] font-serif text-base leading-relaxed border-none focus-visible:ring-0 p-8 whitespace-pre-wrap"
+                        value={generatedText}
+                        onChange={(e) => setGeneratedText(e.target.value)}
+                      />
+                      {/* AI Copilot Panel */}
+                      <div className="p-4 bg-muted/50 border-t space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                          <Brain className="h-3 w-3" /> Assistência Jurídica IA
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" className="bg-background text-[10px] h-7 px-2">💎 Refinar fundamentos</Button>
+                          <Button variant="outline" size="sm" className="bg-background text-[10px] h-7 px-2">⚖️ Adicionar jurisprudência</Button>
+                          <Button variant="outline" size="sm" className="bg-background text-[10px] h-7 px-2">🔍 Revisão técnica</Button>
+                          <Button variant="outline" size="sm" className="bg-background text-[10px] h-7 px-2">📝 Resumir peça</Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full py-20 text-center text-muted-foreground opacity-40">
+                      <Sparkles className="h-16 w-16 mb-4" />
+                      <p className="text-sm font-medium">Pronto para gerar sua peça.</p>
+                      <p className="text-xs mt-1">Insira o contexto ao lado e deixe a IA cuidar da redação.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* History (bottom) */}
       <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -276,30 +304,38 @@ INSTRUÇÕES:
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {isLoading ? (
+              {isLoadingPecas ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (pecas ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Nenhuma peça salva ainda.</p>
+                <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                  <Clock className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm text-muted-foreground">Nenhuma peça salva ainda.</p>
+                </div>
               ) : (
                 (pecas ?? []).map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-all cursor-pointer group" onClick={() => loadPeca(p)}>
-                    <FileText className="h-5 w-5 text-primary shrink-0" />
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-all cursor-pointer group"
+                    onClick={() => loadPeca(p)}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded bg-primary/5 text-primary">
+                      <FileText className="h-5 w-5" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{p.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.tipo} {p.process_number && `• ${p.process_number}`} • {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                      <p className="text-sm font-bold truncate">{p.title}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                        {p.tipo} {p.process_number && `• Nº ${p.process_number}`} • {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
                       </p>
                     </div>
-                    <Badge variant="secondary" className="text-xs shrink-0">{p.tipo}</Badge>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive"
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(p.id); }}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))
