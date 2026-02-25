@@ -92,11 +92,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/configuracoes" element={<Configuracoes />} />
-              <Route path="/equipe" element={
-                <ProtectedRoute requiredRole="admin">
-                  <Equipe />
-                </ProtectedRoute>
-              } />
+              <Route path="/equipe" element={<Equipe />} />
               <Route path="/whatsapp" element={<WhatsAppPage />} />
               <Route path="/menu" element={<MobileMenu />} />
             </Route>
