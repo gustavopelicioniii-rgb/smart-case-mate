@@ -120,7 +120,15 @@ const Dashboard = () => {
 
         {/* Header + Health Score */}
         <motion.div variants={item} className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-          <div>
+          <div className="flex items-start gap-4">
+            {profile?.firm_logo_url && (
+              <img
+                src={profile.firm_logo_url}
+                alt="Logo do escritório"
+                className="h-12 w-auto max-w-[160px] object-contain shrink-0 rounded border border-border/50 bg-muted/20 p-1.5"
+              />
+            )}
+            <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
               {getGreeting()}, {displayName}
             </h1>
@@ -135,6 +143,7 @@ const Dashboard = () => {
                 {(feeStats.countPendenteOuAtrasado ?? 0) > 0 && `${feeStats.countPendenteOuAtrasado} honorário(s) pendente(s)`}
               </p>
             ) : null}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <HealthScore score={score} label={label} breakdownItems={breakdownItems} />

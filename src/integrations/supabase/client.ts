@@ -5,15 +5,19 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
     if (import.meta.env.PROD) {
-        throw new Error(
-            'Supabase URL or Anon Key is missing. ' +
-            'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
+        console.error(
+            '[Supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não definidas. ' +
+            'Configure em Vercel: Settings → Environment Variables.'
+        );
+    } else {
+        console.warn(
+            '[Supabase] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing. ' +
+            'Database features will not work until you add them to .env'
         );
     }
-    console.warn(
-        '[Supabase] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing. ' +
-        'Database features will not work until you add them to .env'
-    );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/** Indica se o Supabase está configurado (evita tela branca em produção quando vars faltam). */
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-key');

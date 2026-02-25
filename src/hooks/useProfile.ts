@@ -11,6 +11,7 @@ export interface Profile {
     phone: string | null;
     oab_number: string | null;
     avatar_url: string | null;
+    firm_logo_url: string | null;
     updated_at: string | null;
 }
 
@@ -58,4 +59,61 @@ export function useUpdateProfile() {
 export async function changePassword(newPassword: string) {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
+}
+
+const LOGOS_BUCKET = 'documents';
+const LOGOS_PREFIX = 'logos';
+
+export function useUploadFirmLogo() {
+    const qc = useQueryClient();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const updateProfile = useUpdateProfile();
+
+    return useMutation({
+        mutationFn: async (file: File) => {
+            if (!user) throw new Error('Não autenticado');
+            const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+            if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+                throw new Error('Use uma imagem (PNG, JPG, GIF, WebP ou SVG).');
+            }
+            const path = `${LOGOS_PREFIX}/${user.id}/logo.${ext}`;
+            const { error: uploadError } = await supabase.storage
+                .from(LOGOS_BUCKET)
+                .upload(path, file, { upsert: true, contentType: file.type });
+            if (uploadError) throw uploadError;
+            const { data: urlData } = supabase.storage.from(LOGOS_BUCKET).getPublicUrl(path);
+            const publicUrl = urlData.publicUrl;
+            await updateProfile.mutateAsync({ firm_logo_url: publicUrl });
+            return publicUrl;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['profile'] });
+            toast({ title: 'Logo do escritório atualizada!' });
+        },
+        onError: (e: Error) => {
+            toast({ title: 'Erro ao enviar logo', description: e.message, variant: 'destructive' });
+        },
+    });
+}
+
+export function useRemoveFirmLogo() {
+    const qc = useQueryClient();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const updateProfile = useUpdateProfile();
+
+    return useMutation({
+        mutationFn: async () => {
+            if (!user) throw new Error('Não autenticado');
+            await updateProfile.mutateAsync({ firm_logo_url: null });
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['profile'] });
+            toast({ title: 'Logo removida.' });
+        },
+        onError: (e: Error) => {
+            toast({ title: 'Erro ao remover logo', description: e.message, variant: 'destructive' });
+        },
+    });
 }

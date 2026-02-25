@@ -10,6 +10,7 @@ export interface Database {
           phone: string | null;
           oab_number: string | null;
           avatar_url: string | null;
+          firm_logo_url: string | null;
           updated_at: string | null;
         };
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'id'> & { id?: string };
@@ -193,6 +194,27 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['user_permissions']['Row'], 'id'>;
         Update: Partial<Database['public']['Tables']['user_permissions']['Insert']>;
+      };
+      agenda_events: {
+        Row: {
+          id: string;
+          created_at: string;
+          owner_id: string | null;
+          titulo: string;
+          tipo: string;
+          data: string;
+          hora_inicio: string;
+          hora_fim: string;
+          participantes: string | null;
+          cliente_id: string | null;
+          processo_id: string | null;
+          cliente_nome: string | null;
+          processo_numero: string | null;
+          link: string | null;
+          status: string;
+        };
+        Insert: Omit<Database['public']['Tables']['agenda_events']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['agenda_events']['Insert']>;
       };
     };
   };

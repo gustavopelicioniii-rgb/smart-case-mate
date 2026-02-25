@@ -25,6 +25,7 @@ import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,7 +37,31 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+/** Tela exibida quando as variáveis do Supabase não estão configuradas na Vercel (evita tela branca). */
+const ConfigNeededScreen = () => (
+  <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, sans-serif", textAlign: "center" }}>
+    <div style={{ maxWidth: 480 }}>
+      <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: 12 }}>Configuração necessária</h1>
+      <p style={{ marginBottom: 16, color: "#475569" }}>
+        As variáveis de ambiente do Supabase não estão definidas neste deploy. Por isso o sistema não consegue carregar.
+      </p>
+      <p style={{ marginBottom: 8, fontSize: "0.875rem", color: "#64748b" }}>
+        No painel da <strong>Vercel</strong>: <strong>Settings</strong> → <strong>Environment Variables</strong>. Adicione:
+      </p>
+      <ul style={{ textAlign: "left", marginBottom: 16, fontSize: "0.875rem", color: "#475569" }}>
+        <li><code style={{ background: "#e2e8f0", padding: "2px 6px", borderRadius: 4 }}>VITE_SUPABASE_URL</code> — URL do projeto (ex.: https://xxxxx.supabase.co)</li>
+        <li><code style={{ background: "#e2e8f0", padding: "2px 6px", borderRadius: 4 }}>VITE_SUPABASE_ANON_KEY</code> — Chave anônima (Project Settings → API no Supabase)</li>
+      </ul>
+      <p style={{ fontSize: "0.875rem", color: "#64748b" }}>Depois, faça um novo deploy (Redeploy) para aplicar.</p>
+    </div>
+  </div>
+);
+
+const App = () => {
+  if (import.meta.env.PROD && !isSupabaseConfigured) {
+    return <ConfigNeededScreen />;
+  }
+  return (
   <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -82,6 +107,7 @@ const App = () => (
       </AuthProvider>
     </QueryClientProvider>
   </ThemeProvider>
-);
+  );
+};
 
 export default App;

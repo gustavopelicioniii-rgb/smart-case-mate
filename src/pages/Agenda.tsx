@@ -13,6 +13,7 @@ import AgendaSubNav from "@/components/agenda/AgendaSubNav";
 import MeetingCard from "@/components/agenda/MeetingCard";
 import NewMeetingModal from "@/components/agenda/NewMeetingModal";
 import { useGoogleCalendar, type GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
+import { useAgendaEvents } from "@/hooks/useAgendaEvents";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -85,10 +86,12 @@ const Agenda = () => {
   const [tab, setTab] = useState("hoje");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [newMeetingOpen, setNewMeetingOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<import("@/types/agenda").AgendaEvent | null>(null);
   const [mainTab, setMainTab] = useState("local");
 
   const gcal = useGoogleCalendar();
-  const localEvents = useMemo(() => [], []);
+  const { data: agendaEvents = [], isLoading: agendaLoading } = useAgendaEvents();
+  const localEvents = useMemo(() => agendaEvents, [agendaEvents]);
 
   const filteredEvents = useMemo(() => {
     const now = new Date();
@@ -154,7 +157,7 @@ const Agenda = () => {
                 Conectar Google Calendar
               </Button>
             )}
-            <Button onClick={() => setNewMeetingOpen(true)} className="gap-2">
+            <Button onClick={() => { setEditingEvent(null); setNewMeetingOpen(true); }} className="gap-2">
               <Plus className="h-4 w-4" />
               Nova Reunião
             </Button>
@@ -207,15 +210,26 @@ const Agenda = () => {
               </div>
 
               <div className="order-1 lg:order-2 space-y-3">
-                {filteredEvents.length > 0 ? (
+                {agendaLoading ? (
+                  <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Carregando agenda...</span>
+                  </div>
+                ) : filteredEvents.length > 0 ? (
                   [...filteredEvents]
                     .sort((a, b) => a.hora.localeCompare(b.hora))
-                    .map((event) => <MeetingCard key={event.id} event={event} />)
+                    .map((event) => (
+                    <MeetingCard
+                      key={event.id}
+                      event={event}
+                      onEdit={(e) => setEditingEvent(e)}
+                    />
+                  ))
                 ) : (
                   <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-12 text-center">
                     <CalendarIcon className="h-10 w-10 text-muted-foreground/50 mb-3" />
                     <p className="text-sm text-muted-foreground">Nenhum evento para este período.</p>
-                    <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => setNewMeetingOpen(true)}>
+                    <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => { setEditingEvent(null); setNewMeetingOpen(true); }}>
                       <Plus className="h-3.5 w-3.5" />
                       Agendar reunião
                     </Button>
@@ -278,7 +292,17 @@ const Agenda = () => {
         </Tabs>
       </motion.div>
 
-      <NewMeetingModal open={newMeetingOpen} onOpenChange={setNewMeetingOpen} />
+      <NewMeetingModal
+        open={newMeetingOpen || !!editingEvent}
+        onOpenChange={(open) => {
+          if (!open) {
+            setNewMeetingOpen(false);
+            setEditingEvent(null);
+          }
+        }}
+        initialEvent={editingEvent}
+        onCreated={(date) => setSelectedDate(date)}
+      />
     </>
   );
 };

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateCrmClient, useUpdateCrmClient, type CrmClient, type CrmClientInsert } from "@/hooks/useCrm";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface ClientModalProps {
     open: boolean;
@@ -37,6 +38,10 @@ export default function ClientModal({ open, onOpenChange, client, stageId, posit
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.name) return;
+        if (!isEditing && !stageId) {
+            toast.error("Nenhuma coluna selecionada. Feche o modal e use «Adicionar» na coluna desejada.");
+            return;
+        }
 
         if (isEditing && client) {
             await updateMutation.mutateAsync({ id: client.id, ...form });

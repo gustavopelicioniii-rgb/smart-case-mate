@@ -62,7 +62,15 @@ const Login: React.FC = () => {
                 }
             }
         } catch (error: any) {
-            toast.error(error.message || 'Erro durante a autenticação');
+            const msg = error?.message ?? '';
+            if (msg.includes('Failed to fetch') || msg.includes('fetch')) {
+                toast.error(
+                    'Não foi possível conectar ao servidor. Confira no Supabase: Authentication → URL Configuration → adicione a URL deste site em "Site URL" e "Redirect URLs".',
+                    { duration: 8000 }
+                );
+            } else {
+                toast.error(msg || 'Erro durante a autenticação');
+            }
         } finally {
             setLoading(false);
         }

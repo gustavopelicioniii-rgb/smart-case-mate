@@ -11,6 +11,7 @@ import { useInbox } from "@/hooks/useInbox";
 import { useDeadlinesStats } from "@/hooks/useDeadlines";
 import { useFees } from "@/hooks/useFees";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useAgendaEvents } from "@/hooks/useAgendaEvents";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
 
 interface ActionItem {
@@ -52,11 +53,38 @@ const TodayActions = () => {
   const { criticalList } = useDeadlinesStats();
   const { data: fees } = useFees();
   const { events: gcalEvents, isConnected } = useGoogleCalendar();
+  const { data: agendaEvents = [] } = useAgendaEvents();
 
   const allActions = useMemo(() => {
     const list: ActionItem[] = [];
     const today = new Date();
     const todayStr = format(today, "yyyy-MM-dd");
+
+    agendaEvents.forEach((e) => {
+      const eventDayStr = format(e.data, "yyyy-MM-dd");
+      if (eventDayStr !== todayStr) return;
+      const agendaEvent: AgendaEvent = {
+        id: e.id,
+        titulo: e.titulo,
+        tipo: e.tipo,
+        data: e.data,
+        hora: e.hora,
+        horaFim: e.horaFim,
+        link: e.link,
+        cliente: e.cliente,
+        processo: e.processo,
+      };
+      list.push({
+        id: `agenda-${e.id}`,
+        text: e.titulo,
+        detail: `${e.hora}${e.horaFim ? ` – ${e.horaFim}` : ""}`,
+        priority: "alta",
+        actionLabel: e.link ? "Entrar" : "Ver",
+        actionIcon: e.link ? Video : Eye,
+        responsible: "",
+        meetingEvent: agendaEvent,
+      });
+    });
 
     if (isConnected && gcalEvents?.length) {
       gcalEvents.forEach((e) => {
@@ -143,7 +171,7 @@ const TodayActions = () => {
     });
 
     return list;
-  }, [inboxItems, criticalList, fees, gcalEvents, isConnected]);
+  }, [inboxItems, criticalList, fees, gcalEvents, isConnected, agendaEvents]);
 
   const filtered = useMemo(
     () =>

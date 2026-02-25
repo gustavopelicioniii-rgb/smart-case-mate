@@ -27,6 +27,23 @@ No projeto na Vercel, vá em **Settings** → **Environment Variables** e adicio
 
 Defina as duas para **Production**, **Preview** e **Development** se for usar os três ambientes.
 
+## 3.1. Tabela da Agenda (reuniões locais)
+
+Para que as reuniões criadas na **Agenda** sejam salvas e apareçam na lista e no Dashboard:
+
+1. No [Supabase](https://supabase.com), abra seu projeto → **SQL Editor**.
+2. Crie uma nova query e **cole o conteúdo completo** do arquivo `supabase/migrations/20250225000000_create_agenda_events.sql` (não cole o caminho do arquivo, e sim o texto SQL que está dentro dele).
+3. Execute a query (Run). Assim a tabela `agenda_events` e as políticas de segurança (RLS) são criadas.
+
+Se não fizer isso, ao clicar em "Criar reunião" aparecerá erro e a reunião não será salva.
+
+## 3.2. Logo do escritório (opcional)
+
+Para permitir que o cliente faça upload da logo nas **Configurações** e ela apareça no painel e no dashboard:
+
+1. No Supabase → **SQL Editor**, execute o conteúdo do arquivo `supabase/migrations/20250225100000_add_firm_logo_to_profiles.sql` (adiciona a coluna `firm_logo_url` na tabela `profiles`).
+2. O upload usa o bucket **documents** do Storage. Se o bucket existir e permitir uploads do usuário autenticado, a logo funcionará; se der erro de permissão, crie uma política no Storage para a pasta `logos/` no bucket `documents` (ou use um bucket público `logos`).
+
 ## 4. Deploy
 
 1. Clique em **Deploy**.
@@ -37,10 +54,43 @@ O arquivo **vercel.json** na raiz já está configurado para:
 - Usar o diretório de build **dist**.
 - Aplicar **rewrites** para o **index.html**, para o roteamento do React Router (SPA) funcionar em todas as rotas (ex.: `/documentos`, `/processos`).
 
-## 5. Depois do deploy
+## 5. Tela branca ou “Carregando…” que não sai?
+
+Siga na ordem:
+
+**A) Root Directory (repositório com mais de uma pasta)**  
+Se o repositório não for só o app (ex.: tem pasta `smart-case-mate` dentro), em **Settings** → **General** → **Root Directory** defina a pasta que contém o `package.json` e o `vite.config` (ex.: `smart-case-mate`). Salve e faça **Redeploy**.
+
+**B) Variáveis de ambiente**  
+Em **Settings** → **Environment Variables**:
+- **Key** = nome exato: `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+- **Value** = a URL completa do Supabase e a chave **anon public** (não coloque a URL/chave no campo Key).
+- Marque **Production** (e Preview se quiser).
+- Depois de salvar, faça **Redeploy** (Deployments → ⋮ → Redeploy). Variáveis novas só valem em deploy novo.
+
+**C) Console do navegador**  
+Abra a URL do deploy (ex.: `sistemaadvocacia-mocha.vercel.app`), pressione **F12** → aba **Console**. Se aparecer erro em vermelho, anote a mensagem (ou envie um print). Isso indica se falta variável, 404 no JS ou outro erro em tempo de execução.
+
+## 6. "Failed to fetch" ao logar ou criar conta
+
+Esse erro aparece quando o navegador não consegue falar com o Supabase. Ajuste no **Supabase**:
+
+1. Abra o [Dashboard do Supabase](https://supabase.com/dashboard) → seu projeto.
+2. Vá em **Authentication** → **URL Configuration**.
+3. Em **Site URL**, coloque a URL do seu app na Vercel, por exemplo:  
+   `https://sistemaadvocacia-mocha.vercel.app`
+4. Em **Redirect URLs**, adicione (uma por linha):
+   - `https://sistemaadvocacia-mocha.vercel.app`
+   - `https://sistemaadvocacia-mocha.vercel.app/**`
+   - Se tiver outros domínios (ex.: preview), adicione também.
+5. Salve (**Save**).
+
+Confirme também que o projeto não está **pausado** (no free tier, projetos pausam por inatividade; na home do projeto aparece um aviso e um botão para retomar).
+
+## 7. Depois do deploy
 
 - **Domínio:** em **Settings** → **Domains** você pode adicionar um domínio próprio.
-- **Supabase:** em **Authentication** → **URL Configuration**, adicione a URL da Vercel (ex.: `https://seu-projeto.vercel.app`) em **Site URL** e em **Redirect URLs**, para o login funcionar corretamente.
+- **Supabase:** além do passo 6 acima, use a mesma URL em **Site URL** e **Redirect URLs** para o login e o redirect pós-login funcionarem.
 
 ## Resumo
 

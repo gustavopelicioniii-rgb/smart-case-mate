@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Video, MapPin, Link as LinkIcon, Users, Clock, Sparkles, Loader2 } from "lucide-react";
@@ -22,14 +22,24 @@ import { Switch } from "@/components/ui/switch";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useCrmClients } from "@/hooks/useCrm";
 import { useProcessos } from "@/hooks/useProcessos";
+import { useCreateAgendaEvent, useUpdateAgendaEvent } from "@/hooks/useAgendaEvents";
+import { useAuth } from "@/contexts/AuthContext";
 import type { MeetingType } from "@/types/agenda";
+import type { AgendaEvent } from "@/types/agenda";
 
 interface NewMeetingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Em modo edição: evento a editar. Quando definido, o modal preenche o formulário e salva com update. */
+  initialEvent?: AgendaEvent | null;
+  /** Chamado após criar a reunião com sucesso; recebe a data do evento para a agenda poder exibir esse dia. */
+  onCreated?: (date: Date) => void;
 }
 
-const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
+const eventTypeToMeetingType = (t: string): MeetingType =>
+  t === "reuniao-meet" ? "google-meet" : t === "reuniao-zoom" ? "zoom" : "presencial";
+
+const NewMeetingModal = ({ open, onOpenChange, initialEvent, onCreated }: NewMeetingModalProps) => {
   const [titulo, setTitulo] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [processoId, setProcessoId] = useState("");
@@ -43,8 +53,30 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
   const [createMeet, setCreateMeet] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const gcal = useGoogleCalendar();
+  const { user } = useAuth();
   const { data: crmClients } = useCrmClients();
   const { data: processos } = useProcessos();
+  const createAgendaEvent = useCreateAgendaEvent();
+  const updateAgendaEvent = useUpdateAgendaEvent();
+  const isEdit = !!initialEvent?.id;
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialEvent) {
+      setTitulo(initialEvent.titulo);
+      setClienteId(initialEvent.clienteId ?? "");
+      setProcessoId(initialEvent.processoId ?? "");
+      setData(new Date(initialEvent.data));
+      setHoraInicio(initialEvent.hora ?? "09:00");
+      setHoraFim(initialEvent.horaFim ?? "10:00");
+      setParticipantes(initialEvent.participantes?.join(", ") ?? "");
+      setTipo(eventTypeToMeetingType(initialEvent.tipo));
+      setLink(initialEvent.link ?? "");
+    } else {
+      setTitulo(""); setClienteId(""); setProcessoId(""); setData(undefined);
+      setHoraInicio("09:00"); setHoraFim("10:00"); setParticipantes(""); setTipo("presencial"); setLink("");
+    }
+  }, [open, initialEvent]);
 
   const handleGenerateLink = () => {
     const fakeLink =
@@ -55,14 +87,53 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
     toast.success("Link gerado automaticamente");
   };
 
-  const handleCreate = async () => {
+  const tipoDb = tipo === "presencial" ? "reuniao" : tipo === "google-meet" ? "reuniao-meet" : "reuniao-zoom";
+  const clienteNome = clienteId ? (crmClients ?? []).find((c) => c.id === clienteId)?.name : undefined;
+  const processoNumero = processoId ? (processos ?? []).find((p) => p.id === processoId)?.number : undefined;
+
+  const handleSubmit = async () => {
     if (!titulo || !data) {
       toast.error("Preencha ao menos o título e a data.");
       return;
     }
     setIsCreating(true);
     try {
-      if (gcal.isConnected && syncGoogle) {
+      if (isEdit && initialEvent) {
+        await updateAgendaEvent.mutateAsync({
+          id: initialEvent.id,
+          titulo,
+          tipo: tipoDb,
+          data: format(data, "yyyy-MM-dd"),
+          hora_inicio: horaInicio,
+          hora_fim: horaFim,
+          participantes: participantes.trim() || null,
+          cliente_id: clienteId || null,
+          processo_id: processoId || null,
+          cliente_nome: clienteNome ?? null,
+          processo_numero: processoNumero ?? null,
+          link: link.trim() || null,
+        });
+        toast.success("Reunião atualizada!", {
+          description: `${titulo} – ${format(data, "dd/MM/yyyy")} às ${horaInicio}`,
+        });
+        onOpenChange(false);
+      } else {
+        await createAgendaEvent.mutateAsync({
+          owner_id: user?.id ?? null,
+          titulo,
+          tipo: tipoDb,
+          data: format(data, "yyyy-MM-dd"),
+          hora_inicio: horaInicio,
+          hora_fim: horaFim,
+          participantes: participantes.trim() || undefined,
+          cliente_id: clienteId || undefined,
+          processo_id: processoId || undefined,
+          cliente_nome: clienteNome,
+          processo_numero: processoNumero,
+          link: link.trim() || undefined,
+        });
+
+        if (gcal.isConnected && syncGoogle) {
         const startDateTime = `${format(data, "yyyy-MM-dd")}T${horaInicio}:00`;
         const endDateTime = `${format(data, "yyyy-MM-dd")}T${horaFim}:00`;
         const attendeeEmails = participantes
@@ -81,16 +152,27 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
         if (created?.hangoutLink) {
           setLink(created.hangoutLink);
         }
+        }
+        onCreated?.(data);
+        toast.success("Reunião criada com sucesso!", {
+          description: `${titulo} – ${format(data, "dd/MM/yyyy")} às ${horaInicio}`,
+        });
+        onOpenChange(false);
+        setTitulo(""); setClienteId(""); setProcessoId(""); setData(undefined);
+        setHoraInicio("09:00"); setHoraFim("10:00"); setParticipantes(""); setTipo("presencial"); setLink("");
+        setSyncGoogle(true); setCreateMeet(false);
       }
-      toast.success("Reunião criada com sucesso!", {
-        description: `${titulo} – ${format(data, "dd/MM/yyyy")} às ${horaInicio}`,
-      });
-      onOpenChange(false);
-      setTitulo(""); setClienteId(""); setProcessoId(""); setData(undefined);
-      setHoraInicio("09:00"); setHoraFim("10:00"); setParticipantes(""); setTipo("presencial"); setLink("");
-      setSyncGoogle(true); setCreateMeet(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao criar reunião");
+    } catch (err: unknown) {
+      const raw =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? (err as { error_description?: string })?.error_description ?? "";
+      const msg =
+        raw && (raw.includes("agenda_events") || raw.includes("does not exist"))
+          ? "Tabela da agenda não existe no Supabase. No painel do Supabase, abra o SQL Editor e execute o conteúdo do arquivo supabase/migrations/20250225000000_create_agenda_events.sql"
+          : raw || "Erro ao criar reunião";
+      toast.error("Erro ao salvar reunião", { description: msg });
+      if (import.meta.env.DEV) console.error("[NewMeetingModal] createAgendaEvent failed", err);
     } finally {
       setIsCreating(false);
     }
@@ -100,7 +182,7 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Nova Reunião</DialogTitle>
+          <DialogTitle className="font-display text-xl">{isEdit ? "Editar Reunião" : "Nova Reunião"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -239,9 +321,11 @@ const NewMeetingModal = ({ open, onOpenChange }: NewMeetingModalProps) => {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleCreate} disabled={isCreating}>
+          <Button onClick={handleSubmit} disabled={isCreating}>
             {isCreating ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Salvando..." : "Criando..."}</>
+            ) : isEdit ? (
+              "Salvar"
             ) : (
               "Criar reunião"
             )}

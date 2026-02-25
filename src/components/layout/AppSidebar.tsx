@@ -103,16 +103,26 @@ const AppSidebar = () => {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Logo */}
+      {/* Logo do escritório ou padrão */}
       <div className="flex h-16 items-center gap-2 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="font-display text-lg font-bold text-sidebar-accent-foreground">
-            Advogado<span className="text-sidebar-primary">10X</span>
-          </h1>
-        </div>
+        {profile?.firm_logo_url ? (
+          <img
+            src={profile.firm_logo_url}
+            alt="Logo do escritório"
+            className="h-9 w-auto max-w-[140px] object-contain"
+          />
+        ) : (
+          <>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
+              <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-display text-lg font-bold text-sidebar-accent-foreground">
+                Advogado<span className="text-sidebar-primary">10X</span>
+              </h1>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main Navigation */}

@@ -9,6 +9,7 @@ import JoinMeetingModal from "./JoinMeetingModal";
 interface MeetingCardProps {
   event: AgendaEvent;
   compact?: boolean;
+  onEdit?: (event: AgendaEvent) => void;
 }
 
 const getUrgencyBadge = (event: AgendaEvent) => {
@@ -33,7 +34,7 @@ const getUrgencyBadge = (event: AgendaEvent) => {
 
 const isOnlineMeeting = (tipo: string) => tipo === "reuniao-meet" || tipo === "reuniao-zoom";
 
-const MeetingCard = ({ event, compact }: MeetingCardProps) => {
+const MeetingCard = ({ event, compact, onEdit }: MeetingCardProps) => {
   const [joinOpen, setJoinOpen] = useState(false);
   const config = eventTypeConfig[event.tipo];
   const urgency = getUrgencyBadge(event);
@@ -87,7 +88,7 @@ const MeetingCard = ({ event, compact }: MeetingCardProps) => {
                   Entrar
                 </Button>
               )}
-              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => onEdit?.(event)}>
                 <Edit className="h-3 w-3" />
                 {!compact && "Editar"}
               </Button>

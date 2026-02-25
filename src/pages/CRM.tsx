@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   DragDropContext, Droppable, Draggable,
@@ -45,6 +45,7 @@ const CRM = () => {
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<CrmClient | null>(null);
   const [targetStageId, setTargetStageId] = useState("");
+  const newClientStageIdRef = useRef<string>("");
   const [editingStageName, setEditingStageName] = useState<string | null>(null);
   const [stageNameDraft, setStageNameDraft] = useState("");
   const [newStageName, setNewStageName] = useState("");
@@ -141,9 +142,25 @@ const CRM = () => {
   };
 
   const openNewClient = (stageId: string) => {
+    if (!stageId) return;
+    newClientStageIdRef.current = stageId;
     setEditingClient(null);
     setTargetStageId(stageId);
     setClientModalOpen(true);
+  };
+
+  const handleNewClientClick = async () => {
+    const firstStageId = stages?.[0]?.id;
+    if ((stages?.length ?? 0) === 0 || !firstStageId) {
+      const newStage = await createStage.mutateAsync({
+        name: "Leads",
+        color: "bg-slate-100 text-slate-700",
+        position: 0,
+      });
+      openNewClient(newStage.id);
+    } else {
+      openNewClient(firstStageId);
+    }
   };
 
   const openEditClient = (client: CrmClient) => {
@@ -176,7 +193,7 @@ const CRM = () => {
             <Button variant="outline" onClick={() => setAddingStage(true)}>
               <Plus className="mr-2 h-4 w-4" />Nova Coluna
             </Button>
-            <Button onClick={() => openNewClient(stages?.[0]?.id ?? "")}>
+            <Button onClick={handleNewClientClick} disabled={createStage.isPending}>
               <Plus className="mr-2 h-4 w-4" />Novo Cliente
             </Button>
           </div>
@@ -347,12 +364,12 @@ const CRM = () => {
       </motion.div>
 
       <ClientModal
-        key={editingClient?.id ?? `new-${targetStageId}`}
+        key={editingClient?.id ?? `new-${newClientStageIdRef.current || targetStageId}`}
         open={clientModalOpen}
         onOpenChange={setClientModalOpen}
         client={editingClient}
-        stageId={targetStageId}
-        position={getClientsForStage(targetStageId).length}
+        stageId={editingClient ? editingClient.stage_id : (newClientStageIdRef.current || targetStageId)}
+        position={getClientsForStage(editingClient ? editingClient.stage_id : (newClientStageIdRef.current || targetStageId)).length}
       />
       <CsvImportModal open={importOpen} onOpenChange={setImportOpen} type="crm_clients" />
 
