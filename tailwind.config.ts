@@ -14,8 +14,12 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Playfair Display", "serif"],
-        sans: ["Inter", "sans-serif"],
+        display: ["Montserrat", "system-ui", "sans-serif"],
+        sans: ["Montserrat", "system-ui", "sans-serif"],
+      },
+      spacing: {
+        "content": "var(--spacing-content, 1.5rem)",
+        "section": "var(--spacing-section, 2rem)",
       },
       colors: {
         border: "hsl(var(--border))",

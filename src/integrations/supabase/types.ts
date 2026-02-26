@@ -323,6 +323,45 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['process_documents']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['process_documents']['Insert']>;
       };
+      calculos: {
+        Row: {
+          id: string;
+          created_at: string;
+          owner_id: string | null;
+          cliente_id: string | null;
+          processo_id: string | null;
+          tipo_calculo: string;
+          versao_formula: number;
+          parametros_json: Record<string, unknown>;
+          resultado_json: Record<string, unknown> | null;
+          hash_integridade: string | null;
+          titulo: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['calculos']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['calculos']['Insert']>;
+      };
+      indices_oficiais: {
+        Row: {
+          id: string;
+          created_at: string;
+          indice: string;
+          referencia: string;
+          valor: number;
+        };
+        Insert: Omit<Database['public']['Tables']['indices_oficiais']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['indices_oficiais']['Insert']>;
+      };
+      calculo_logs: {
+        Row: {
+          id: string;
+          created_at: string;
+          calculo_id: string;
+          evento: string;
+          detalhes: Record<string, unknown> | null;
+        };
+        Insert: Omit<Database['public']['Tables']['calculo_logs']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['calculo_logs']['Insert']>;
+      };
     };
   };
 }

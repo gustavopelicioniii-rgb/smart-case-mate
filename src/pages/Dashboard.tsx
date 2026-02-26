@@ -102,14 +102,14 @@ const Dashboard = () => {
 
   return (
     <>
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-8 min-w-0 w-full max-w-full">
         {/* Alerta antes do vencimento — destaque no topo */}
         {urgentes > 0 && (
           <motion.div variants={item}>
-            <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/5">
+            <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/5 px-4 py-3">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Alerta de prazo processual</AlertTitle>
-              <AlertDescription className="flex flex-wrap items-center gap-2">
+              <AlertDescription className="flex flex-wrap items-center gap-2 pr-1">
                 <span>{urgentes} prazo(s) vence(m) nos próximos dias. Contagem em dias úteis.</span>
                 <Button variant="outline" size="sm" asChild className="border-amber-600 text-amber-700 dark:text-amber-400">
                   <Link to="/processos">Ver prazos</Link>

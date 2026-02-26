@@ -103,7 +103,7 @@ const CriticalDeadlines = () => {
           </Button>
         </CardHeader>
         <CardContent className="space-y-2.5">
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-xs text-foreground/75 mb-2">
             Contagem em dias úteis (feriados forenses descontados). Alerta antes do vencimento.
           </p>
           {activeDeadlines.length === 0 ? (

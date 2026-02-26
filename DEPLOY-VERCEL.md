@@ -65,6 +65,42 @@ Para a aba **Despesas** na seção Financeiro (luz, água, assinaturas, outros),
 
 Para que cada usuário veja apenas **suas** movimentações de processos e **suas** despesas, execute no SQL Editor o conteúdo de `supabase/migrations/20250225230000_rls_multi_tenant.sql`. Deve ser aplicado **depois** das migrations 3.3 e 3.4.
 
+## 3.6. Calculadora Jurídica (passo 2 e 3)
+
+A **Calculadora Jurídica** aparece no menu lateral em **FERRAMENTAS** com o nome **"Calculadora Jurídica"** (ícone de calculadora). Se não aparecer, faça um novo deploy do app na Vercel com o código mais recente.
+
+Para a Calculadora funcionar (módulo Correção de Valores e histórico), faça estes dois passos:
+
+### Passo 2 — Criar as tabelas no banco (migration)
+
+1. Acesse o [Supabase](https://supabase.com/dashboard) → seu projeto.
+2. No menu lateral, clique em **SQL Editor**.
+3. Clique em **New query**.
+4. Abra o arquivo do projeto: `supabase/migrations/20250225260000_calculadora_juridica.sql`.
+5. **Copie todo o conteúdo** desse arquivo (do início ao fim) e **cole** na caixa de texto do SQL Editor.
+6. Clique em **Run** (ou Ctrl+Enter).
+7. Deve aparecer “Success” em verde. Assim as tabelas `calculos`, `indices_oficiais` e `calculo_logs` são criadas.
+
+Sem esse passo, ao clicar em “Realizar Cálculo” na Correção de Valores pode dar erro ou o histórico “Meus Cálculos” não funciona.
+
+### Passo 3 — Publicar a Edge Function (cálculo no servidor)
+
+O cálculo é feito no servidor (Edge Function), não no navegador. Use **npx** (não é preciso instalar o Supabase CLI globalmente):
+
+1. No seu computador, abra o terminal **na pasta do projeto** (ex.: `smart-case-mate`).
+2. Faça login no Supabase (abre o navegador para você autorizar):  
+   `npx supabase login`
+3. Vincule o projeto (o **Project ref** está em Supabase → **Project Settings** → **General**):  
+   `npx supabase link --project-ref SEU_PROJECT_REF`
+4. Envie a função da calculadora:  
+   `npx supabase functions deploy calculadora-correcao`
+
+Depois disso, ao preencher o formulário em **Calculadora Jurídica** → **Correção de Valores** e clicar em **Realizar Cálculo**, o sistema chama essa função e exibe o resultado.
+
+**Observação:** Não use `npm install -g supabase` — a instalação global do CLI não é mais suportada. Use sempre `npx supabase` na pasta do projeto.
+
+**Resumo:** Passo 2 = rodar a migration no SQL Editor; Passo 3 = `npx supabase login`, depois `npx supabase link --project-ref XXX`, depois `npx supabase functions deploy calculadora-correcao`.
+
 ## 4. Deploy
 
 1. Clique em **Deploy**.
@@ -142,14 +178,13 @@ Assim a função consegue chamar a API do Escavador quando rodar.
 
 ### Passo 2 — Publicar a Edge Function e agendar o cron
 
-1. No seu PC, na pasta do projeto (ex.: `smart-case-mate`), instale o CLI do Supabase se ainda não tiver:  
-   `npm install -g supabase`
-2. Faça login: `supabase login`
-3. Vincule o projeto: `supabase link --project-ref SEU_PROJECT_REF` (o ref está em Supabase → Project Settings → General).
-4. Envie a função:  
-   `supabase functions deploy process-monitor-cron`
-5. Defina o secret pelo CLI (se preferir):  
-   `supabase secrets set ESCAVADOR_API_TOKEN=seu_token_aqui`
+1. No seu PC, na pasta do projeto (ex.: `smart-case-mate`), use **npx** (não instale o CLI globalmente):  
+   `npx supabase login`  
+   `npx supabase link --project-ref SEU_PROJECT_REF` (o ref está em Supabase → Project Settings → General).
+2. Envie a função:  
+   `npx supabase functions deploy process-monitor-cron`
+3. Defina o secret pelo CLI (se preferir):  
+   `npx supabase secrets set ESCAVADOR_API_TOKEN=seu_token_aqui`
 6. Para rodar **1x por dia** (ex.: 6h), use um agendador externo:
    - **Vercel Cron:** crie em `vercel.json` um cron que chame a URL da Edge Function (com auth) no horário desejado.
    - Ou um serviço como [cron-job.org](https://cron-job.org) que faça um **POST** para:  

@@ -24,6 +24,9 @@ import MobileMenu from "./pages/MobileMenu";
 import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import Calculadora from "./pages/Calculadora";
+import CorrecaoValores from "./pages/calculadora/CorrecaoValores";
+import MeusCalculos from "./pages/calculadora/MeusCalculos";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
@@ -94,6 +97,9 @@ const App = () => {
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/equipe" element={<Equipe />} />
               <Route path="/whatsapp" element={<WhatsAppPage />} />
+              <Route path="/calculadora" element={<Calculadora />} />
+              <Route path="/calculadora/correcao" element={<CorrecaoValores />} />
+              <Route path="/calculadora/meus-calculos" element={<MeusCalculos />} />
               <Route path="/menu" element={<MobileMenu />} />
             </Route>
             <Route path="*" element={<NotFound />} />

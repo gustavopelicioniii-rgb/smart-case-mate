@@ -18,20 +18,20 @@ const MobileBottomNav = () => {
         href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
 
     return (
-        <nav className="fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border lg:hidden">
-            <div className="flex items-center justify-around h-16 px-1 safe-area-pb">
+        <nav className="fixed bottom-0 inset-x-0 z-50 bg-background/95 backdrop-blur border-t border-border lg:hidden">
+            <div className="flex items-center justify-around h-[72px] px-2 safe-area-pb">
                 {tabs.map((tab) => (
                     <Link
                         key={tab.name}
                         to={tab.href}
                         className={cn(
-                            "flex flex-col items-center justify-center gap-0.5 flex-1 py-1.5 text-[10px] font-medium transition-colors",
+                            "flex flex-col items-center justify-center gap-1.5 flex-1 py-2 text-[11px] font-medium transition-colors",
                             isActive(tab.href)
                                 ? "text-primary"
                                 : "text-muted-foreground"
                         )}
                     >
-                        <tab.icon className={cn("h-5 w-5", isActive(tab.href) && "text-primary")} />
+                        <tab.icon className={cn("h-6 w-6 shrink-0", isActive(tab.href) && "text-primary")} />
                         <span>{tab.name}</span>
                     </Link>
                 ))}

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
     FileText, DollarSign, FolderOpen, Newspaper, BarChart3, Settings,
-    Sparkles, LogOut, ChevronRight, UsersRound, MessageCircle,
+    Sparkles, LogOut, ChevronRight, UsersRound, MessageCircle, Calculator,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -11,7 +11,8 @@ import { useProfile } from "@/hooks/useProfile";
 
 const menuItems = [
     { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: "IA" },
-    { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
+    { name: "Calculadora Jurídica", href: "/calculadora", icon: Calculator },
+    { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle, iconSrc: "/icons/whatsapp.svg" },
     { name: "Financeiro", href: "/financeiro", icon: DollarSign },
     { name: "Documentos", href: "/documentos", icon: FolderOpen },
     { name: "Publicações", href: "/publicacoes", icon: Newspaper },
@@ -32,10 +33,10 @@ const MobileMenu = () => {
         .join("");
 
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-24">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-28 px-1">
             {/* Profile Card */}
-            <Card>
-                <CardContent className="flex items-center gap-4 p-4">
+            <Card className="rounded-xl border-border/80">
+                <CardContent className="flex items-center gap-4 p-5">
                     <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">
                         {initials}
                     </div>
@@ -48,16 +49,20 @@ const MobileMenu = () => {
             </Card>
 
             {/* Menu Items */}
-            <Card>
+            <Card className="rounded-xl border-border/80">
                 <CardContent className="p-2">
                     {menuItems.map((item, idx) => (
                         <div key={item.name}>
                             <Link
                                 to={item.href}
-                                className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted transition-colors"
+                                className="flex items-center gap-3.5 rounded-xl px-3 py-3.5 hover:bg-muted transition-colors"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                                    <item.icon className="h-5 w-5" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground shrink-0">
+                                    {item.iconSrc ? (
+                                        <img src={item.iconSrc} alt="" className="h-5 w-5 object-contain" aria-hidden />
+                                    ) : (
+                                        <item.icon className="h-5 w-5" />
+                                    )}
                                 </div>
                                 <span className="flex-1 text-sm font-medium">{item.name}</span>
                                 {item.badge && (
@@ -75,13 +80,13 @@ const MobileMenu = () => {
             </Card>
 
             {/* Logout */}
-            <Card className="border-destructive/30">
+            <Card className="rounded-xl border-destructive/30">
                 <CardContent className="p-2">
                     <button
                         onClick={signOut}
-                        className="flex items-center gap-3 rounded-lg px-3 py-3 w-full hover:bg-destructive/5 transition-colors text-destructive"
+                        className="flex items-center gap-3.5 rounded-xl px-3 py-3.5 w-full hover:bg-destructive/5 transition-colors text-destructive"
                     >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 shrink-0">
                             <LogOut className="h-5 w-5" />
                         </div>
                         <span className="text-sm font-medium">Sair da Conta</span>
