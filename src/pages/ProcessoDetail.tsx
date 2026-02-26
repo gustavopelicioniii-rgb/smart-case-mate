@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
     ArrowLeft, Clock, Calendar, FileText,
     MessageSquare, Loader2, Plus, Hash, User, MapPin, ExternalLink,
-    MoreHorizontal, Pencil
+    MoreHorizontal, Pencil, Trash2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ import { ptBR } from "date-fns/locale";
 const TIPOS_ANDAMENTO = ["Movimentação", "Despacho", "Decisão", "Petição", "Outro"];
 const TIPOS_AUDIENCIA = ["Conciliação", "Instrução", "Julgamento", "Outra"];
 const STATUS_PROCESSO = ["Em andamento", "Aguardando prazo", "Concluído", "Suspenso"] as const;
+const PROCESS_DOCS_BUCKET = "documents";
 
 const ProcessoDetail = () => {
     const { id } = useParams();
@@ -61,6 +62,14 @@ const ProcessoDetail = () => {
     const [audienciaTipo, setAudienciaTipo] = useState("Conciliação");
     const [audienciaLocal, setAudienciaLocal] = useState("");
     const [audienciaLink, setAudienciaLink] = useState("");
+    const [noteOpen, setNoteOpen] = useState(false);
+    const [noteContent, setNoteContent] = useState("");
+    const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
+    const [docOpen, setDocOpen] = useState(false);
+    const [docTitle, setDocTitle] = useState("");
+    const [docUrl, setDocUrl] = useState("");
+    const [docDescription, setDocDescription] = useState("");
+    const [docFile, setDocFile] = useState<File | null>(null);
 
     const { data: processo, isLoading } = useQuery({
         queryKey: ['processo', id],
@@ -97,6 +106,34 @@ const ProcessoDetail = () => {
                 .select('*')
                 .eq('process_id', id)
                 .order('data', { ascending: true });
+            if (error) return [];
+            return data ?? [];
+        },
+        enabled: !!id,
+    });
+
+    const { data: notes = [] } = useQuery({
+        queryKey: ['process_notes', id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('process_notes')
+                .select('*')
+                .eq('process_id', id)
+                .order('updated_at', { ascending: false });
+            if (error) return [];
+            return data ?? [];
+        },
+        enabled: !!id,
+    });
+
+    const { data: documents = [] } = useQuery({
+        queryKey: ['process_documents', id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('process_documents')
+                .select('*')
+                .eq('process_id', id)
+                .order('created_at', { ascending: false });
             if (error) return [];
             return data ?? [];
         },
@@ -153,6 +190,105 @@ const ProcessoDetail = () => {
             queryClient.invalidateQueries({ queryKey: ['processos'] });
             toast.success('Status atualizado.');
             setStatusOpen(false);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const createNote = useMutation({
+        mutationFn: async (content: string) => {
+            const { error } = await supabase.from('process_notes').insert({
+                process_id: id,
+                content,
+                owner_id: user?.id ?? null,
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['process_notes', id] });
+            toast.success('Nota adicionada.');
+            setNoteOpen(false);
+            setNoteContent('');
+            setNoteEditingId(null);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const updateNote = useMutation({
+        mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
+            const { error } = await supabase.from('process_notes').update({ content }).eq('id', noteId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['process_notes', id] });
+            toast.success('Nota atualizada.');
+            setNoteOpen(false);
+            setNoteContent('');
+            setNoteEditingId(null);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const deleteNote = useMutation({
+        mutationFn: async (noteId: string) => {
+            const { error } = await supabase.from('process_notes').delete().eq('id', noteId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['process_notes', id] });
+            toast.success('Nota removida.');
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const createDoc = useMutation({
+        mutationFn: async (payload: { title: string; url?: string; file_path?: string; description?: string; file?: File }) => {
+            let file_path: string | null = payload.file_path ?? null;
+            if (payload.file && id) {
+                const timestamp = Date.now();
+                const safeName = payload.file.name
+                    .normalize('NFD')
+                    .replace(/\p{Diacritic}/gu, '')
+                    .replace(/[^\w.\-]/g, '_');
+                const storagePath = `process/${id}/${timestamp}_${safeName || 'document'}`;
+                const { error: uploadError } = await supabase.storage
+                    .from(PROCESS_DOCS_BUCKET)
+                    .upload(storagePath, payload.file, { upsert: false });
+                if (uploadError) throw uploadError;
+                file_path = storagePath;
+            }
+            const { error } = await supabase.from('process_documents').insert({
+                process_id: id,
+                title: payload.title,
+                url: payload.url || null,
+                file_path,
+                description: payload.description || null,
+                owner_id: user?.id ?? null,
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['process_documents', id] });
+            toast.success('Documento adicionado.');
+            setDocOpen(false);
+            setDocTitle('');
+            setDocUrl('');
+            setDocDescription('');
+            setDocFile(null);
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+
+    const deleteDoc = useMutation({
+        mutationFn: async ({ docId, filePath }: { docId: string; filePath?: string | null }) => {
+            if (filePath) {
+                await supabase.storage.from(PROCESS_DOCS_BUCKET).remove([filePath]);
+            }
+            const { error } = await supabase.from('process_documents').delete().eq('id', docId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['process_documents', id] });
+            toast.success('Documento removido.');
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -352,16 +488,110 @@ const ProcessoDetail = () => {
                             )}
                         </TabsContent>
 
-                        <TabsContent value="documentos" className="mt-6">
-                            <div className="text-center py-20 text-muted-foreground">
-                                Módulo de documentos em integração...
+                        <TabsContent value="documentos" className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-display font-semibold text-foreground">Documentos e links</h3>
+                                <Button size="sm" variant="outline" onClick={() => setDocOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4" /> Adicionar doc/link
+                                </Button>
                             </div>
+                            {documents.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                                    <FileText className="h-10 w-10 mx-auto mb-4 opacity-20" />
+                                    <p className="text-sm">Nenhum documento ou link. Adicione referências (petições, decisões, URLs).</p>
+                                    <Button size="sm" variant="outline" className="mt-4" onClick={() => setDocOpen(true)}>
+                                        Adicionar doc/link
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {documents.map((doc) => (
+                                        <Card key={doc.id}>
+                                            <CardContent className="p-4 flex items-center justify-between gap-4">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-semibold truncate">{doc.title}</p>
+                                                    {doc.description && (
+                                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{doc.description}</p>
+                                                    )}
+                                                    {(doc.url || doc.file_path) && (
+                                                        <a
+                                                            href={doc.file_path
+                                                                ? supabase.storage.from(PROCESS_DOCS_BUCKET).getPublicUrl(doc.file_path).data.publicUrl
+                                                                : doc.url || '#'}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+                                                        >
+                                                            {doc.url && !doc.file_path ? 'Abrir link' : 'Abrir arquivo'} <ExternalLink className="h-3 w-3" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => deleteDoc.mutate({ docId: doc.id, filePath: doc.file_path })}
+                                                    disabled={deleteDoc.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
                         </TabsContent>
 
-                        <TabsContent value="notas" className="mt-6">
-                            <div className="text-center py-20 text-muted-foreground">
-                                Módulo de notas em integração...
+                        <TabsContent value="notas" className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-display font-semibold text-foreground">Notas internas</h3>
+                                <Button size="sm" variant="outline" onClick={() => { setNoteEditingId(null); setNoteContent(''); setNoteOpen(true); }}>
+                                    <Plus className="mr-2 h-4 w-4" /> Nova nota
+                                </Button>
                             </div>
+                            {notes.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                                    <MessageSquare className="h-10 w-10 mx-auto mb-4 opacity-20" />
+                                    <p className="text-sm">Nenhuma nota. Use para anotações rápidas sobre o processo.</p>
+                                    <Button size="sm" variant="outline" className="mt-4" onClick={() => setNoteOpen(true)}>
+                                        Nova nota
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {notes.map((note) => (
+                                        <Card key={note.id}>
+                                            <CardContent className="p-4">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <p className="text-sm text-foreground whitespace-pre-wrap flex-1">{note.content}</p>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {format(parseISO(note.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                                        </span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground"
+                                                            onClick={() => { setNoteEditingId(note.id); setNoteContent(note.content); setNoteOpen(true); }}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                            onClick={() => deleteNote.mutate(note.id)}
+                                                            disabled={deleteNote.isPending}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
                         </TabsContent>
                     </Tabs>
                 </div>
@@ -484,6 +714,121 @@ const ProcessoDetail = () => {
                         >
                             {createAudiencia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Agendar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal Nova / Editar Nota */}
+            <Dialog open={noteOpen} onOpenChange={(open) => { setNoteOpen(open); if (!open) { setNoteContent(''); setNoteEditingId(null); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{noteEditingId ? 'Editar nota' : 'Nova nota'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <Label htmlFor="note-content">Conteúdo</Label>
+                        <Textarea
+                            id="note-content"
+                            placeholder="Anotação sobre o processo..."
+                            value={noteContent}
+                            onChange={(e) => setNoteContent(e.target.value)}
+                            rows={4}
+                            className="mt-2"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setNoteOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={() => {
+                                const c = noteContent.trim();
+                                if (!c) { toast.error('Digite o conteúdo da nota.'); return; }
+                                if (noteEditingId) updateNote.mutate({ noteId: noteEditingId, content: c });
+                                else createNote.mutate(c);
+                            }}
+                            disabled={createNote.isPending || updateNote.isPending}
+                        >
+                            {(createNote.isPending || updateNote.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            {noteEditingId ? 'Salvar' : 'Adicionar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal Adicionar documento/link ou arquivo */}
+            <Dialog open={docOpen} onOpenChange={(open) => { setDocOpen(open); if (!open) { setDocTitle(''); setDocUrl(''); setDocDescription(''); setDocFile(null); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Adicionar documento, link ou arquivo</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <Label htmlFor="doc-title">Título *</Label>
+                            <Input
+                                id="doc-title"
+                                placeholder={docFile ? docFile.name : "Ex: Petição inicial, Decisão 12/02/2025"}
+                                value={docTitle}
+                                onChange={(e) => setDocTitle(e.target.value)}
+                                className="mt-1"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="doc-file">Arquivo (upload)</Label>
+                            <Input
+                                id="doc-file"
+                                type="file"
+                                className="mt-1"
+                                onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    setDocFile(f || null);
+                                    if (f && !docTitle.trim()) setDocTitle(f.name);
+                                }}
+                            />
+                            {docFile && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {docFile.name} ({(docFile.size / 1024).toFixed(1)} KB)
+                                </p>
+                            )}
+                        </div>
+                        <div>
+                            <Label htmlFor="doc-url">URL (link externo, opcional)</Label>
+                            <Input
+                                id="doc-url"
+                                type="url"
+                                placeholder="https://..."
+                                value={docUrl}
+                                onChange={(e) => setDocUrl(e.target.value)}
+                                className="mt-1"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="doc-desc">Descrição (opcional)</Label>
+                            <Textarea
+                                id="doc-desc"
+                                placeholder="Breve descrição do documento"
+                                value={docDescription}
+                                onChange={(e) => setDocDescription(e.target.value)}
+                                rows={2}
+                                className="mt-1"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDocOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={() => {
+                                const t = (docTitle.trim() || docFile?.name || '').trim();
+                                if (!t) { toast.error('Informe o título.'); return; }
+                                createDoc.mutate({
+                                    title: t,
+                                    url: docUrl.trim() || undefined,
+                                    description: docDescription.trim() || undefined,
+                                    file: docFile || undefined,
+                                });
+                            }}
+                            disabled={createDoc.isPending}
+                        >
+                            {createDoc.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                            Adicionar
                         </Button>
                     </DialogFooter>
                 </DialogContent>

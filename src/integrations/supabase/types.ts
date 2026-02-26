@@ -297,6 +297,32 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['audiencias']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['audiencias']['Insert']>;
       };
+      process_notes: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          process_id: string;
+          content: string;
+          owner_id: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['process_notes']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['process_notes']['Insert']>;
+      };
+      process_documents: {
+        Row: {
+          id: string;
+          created_at: string;
+          process_id: string;
+          title: string;
+          url: string | null;
+          file_path: string | null;
+          description: string | null;
+          owner_id: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['process_documents']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['process_documents']['Insert']>;
+      };
     };
   };
 }

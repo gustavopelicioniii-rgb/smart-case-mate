@@ -115,12 +115,16 @@ const CriticalDeadlines = () => {
               const dateFim = d.dateFim;
               const daysLeft = d.diasUteisRestantes;
               const isUrgent = daysLeft <= 3 || d.isVencido;
+              const processId = "process_id" in d ? (d as { process_id?: string }).process_id : undefined;
+              const Wrapper = processId ? Link : "div";
+              const wrapperProps = processId ? { to: `/processos/${processId}` } : {};
 
               return (
                 <Tooltip key={d.id}>
                   <TooltipTrigger asChild>
-                    <div
-                      className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:scale-[1.005] cursor-pointer ${getDaysLeftBg(daysLeft)}`}
+                    <Wrapper
+                      {...wrapperProps}
+                      className={`flex items-center justify-between rounded-lg border p-4 transition-all hover:scale-[1.005] cursor-pointer ${getDaysLeftBg(daysLeft)} ${processId ? "block hover:opacity-90" : ""}`}
                     >
                       <div className="flex items-center gap-4 min-w-0">
                         <div
@@ -151,7 +155,7 @@ const CriticalDeadlines = () => {
                           </p>
                         </div>
                       </div>
-                    </div>
+                    </Wrapper>
                   </TooltipTrigger>
                   <TooltipContent side="left" className="max-w-xs">
                     <p className="font-semibold">{d.process?.client} – {d.titulo}</p>
