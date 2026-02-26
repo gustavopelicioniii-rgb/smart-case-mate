@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { getPlanProcessLimit, useProfile } from '@/hooks/useProfile';
 
 export interface Processo {
     id: string;
@@ -19,6 +21,7 @@ export interface Processo {
     status: 'Em andamento' | 'Aguardando prazo' | 'Concluído' | 'Suspenso';
     next_deadline: string | null;
     last_movement: string;
+    last_checked_at?: string | null;
     value: number;
     docs_count: number;
     owner_id: string | null;
@@ -44,6 +47,18 @@ export function useProcessos() {
     });
 }
 
+export function useProcessPlanLimit() {
+    const { user } = useAuth();
+    const { data: profile } = useProfile();
+    const { data: processos } = useProcessos();
+    const limit = getPlanProcessLimit(profile?.subscription_plan ?? null);
+    const currentCount = useMemo(
+        () => (processos ?? []).filter((p) => p.owner_id === user?.id).length,
+        [processos, user?.id]
+    );
+    return { limit, currentCount, atLimit: currentCount >= limit };
+}
+
 export function useProcessoStats() {
     const { data: processos } = useProcessos();
     return useMemo(() => {
@@ -64,9 +79,29 @@ export function useProcessoStats() {
 export function useCreateProcesso() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
+    const { user } = useAuth();
 
     return useMutation({
         mutationFn: async (processo: ProcessoInsert) => {
+            if (user?.id) {
+                let limit = 40;
+                try {
+                    const [{ data: profileData }, { count }] = await Promise.all([
+                        supabase.from('profiles').select('subscription_plan').eq('id', user.id).single(),
+                        supabase.from('processos').select('*', { count: 'exact', head: true }).eq('owner_id', user.id),
+                    ]);
+                    limit = getPlanProcessLimit((profileData as { subscription_plan?: string } | null)?.subscription_plan ?? null);
+                    if ((count ?? 0) >= limit) {
+                        throw new Error(`Limite do plano atingido (${limit} processos). Atualize seu plano para cadastrar mais processos.`);
+                    }
+                } catch (e) {
+                    if (e instanceof Error && e.message.includes('Limite do plano')) throw e;
+                    const { count } = await supabase.from('processos').select('*', { count: 'exact', head: true }).eq('owner_id', user.id);
+                    if ((count ?? 0) >= limit) {
+                        throw new Error(`Limite do plano atingido (${limit} processos). Atualize seu plano para cadastrar mais processos.`);
+                    }
+                }
+            }
             const { data, error } = await supabase
                 .from('processos')
                 .insert(processo)

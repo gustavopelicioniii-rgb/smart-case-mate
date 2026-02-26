@@ -3,6 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
+export type SubscriptionPlan = 'start' | 'pro' | 'elite';
+
+export const PLAN_PROCESS_LIMITS: Record<SubscriptionPlan, number> = {
+    start: 40,
+    pro: 100,
+    elite: 250,
+};
+
 export interface Profile {
     id: string;
     full_name: string | null;
@@ -12,7 +20,13 @@ export interface Profile {
     oab_number: string | null;
     avatar_url: string | null;
     firm_logo_url: string | null;
+    subscription_plan?: SubscriptionPlan | null;
     updated_at: string | null;
+}
+
+export function getPlanProcessLimit(plan: SubscriptionPlan | null | undefined): number {
+    if (!plan || !(plan in PLAN_PROCESS_LIMITS)) return PLAN_PROCESS_LIMITS.start;
+    return PLAN_PROCESS_LIMITS[plan as SubscriptionPlan];
 }
 
 export function useProfile() {

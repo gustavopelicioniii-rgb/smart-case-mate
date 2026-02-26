@@ -10,6 +10,7 @@ import RiskCard from "@/components/dashboard/RiskCard";
 import TodayActions from "@/components/dashboard/TodayActions";
 import CriticalDeadlines from "@/components/dashboard/CriticalDeadlines";
 import SmartActivity from "@/components/dashboard/SmartActivity";
+import ProcessMonitorResults from "@/components/dashboard/ProcessMonitorResults";
 import RevenueStats from "@/components/dashboard/RevenueStats";
 import AiAssistantButton from "@/components/dashboard/AiAssistantButton";
 import AiRecommendation from "@/components/dashboard/AiRecommendation";
@@ -169,6 +170,11 @@ const Dashboard = () => {
         {/* 🧠 Recomendação Estratégica da IA */}
         <motion.div variants={item}>
           <AiRecommendation />
+        </motion.div>
+
+        {/* Consultas de processos (monitoramento Escavador) */}
+        <motion.div variants={item}>
+          <ProcessMonitorResults />
         </motion.div>
 
         {/* Atividade Inteligente */}

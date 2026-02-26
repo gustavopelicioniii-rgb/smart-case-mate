@@ -44,6 +44,27 @@ Para permitir que o cliente faça upload da logo nas **Configurações** e ela a
 1. No Supabase → **SQL Editor**, execute o conteúdo do arquivo `supabase/migrations/20250225100000_add_firm_logo_to_profiles.sql` (adiciona a coluna `firm_logo_url` na tabela `profiles`).
 2. O upload usa o bucket **documents** do Storage. Se o bucket existir e permitir uploads do usuário autenticado, a logo funcionará; se der erro de permissão, crie uma política no Storage para a pasta `logos/` no bucket `documents` (ou use um bucket público `logos`).
 
+## 3.3. Monitoramento de processos (Escavador) — banco
+
+Para o sistema poder monitorar processos (1x por dia por processo), planos (Start/Pro/Elite) e salvar movimentações:
+
+1. No [Supabase](https://supabase.com), abra seu projeto → **SQL Editor**.
+2. Crie uma nova query e **cole todo o conteúdo** do arquivo `supabase/migrations/20250225200000_process_monitor_plans_and_movements.sql`.
+3. Clique em **Run**. Isso cria/atualiza:
+   - coluna `last_checked_at` em `processos`
+   - coluna `subscription_plan` em `profiles` (padrão: `start`)
+   - tabelas `process_movements` e `process_monitor_logs`
+
+Sem rodar essa migration, o dashboard de “Consultas de processos” e o limite por plano podem dar erro ou não funcionar.
+
+## 3.4. Despesas do escritório (Financeiro)
+
+Para a aba **Despesas** na seção Financeiro (luz, água, assinaturas, outros), no Supabase → **SQL Editor** execute o conteúdo de `supabase/migrations/20250225220000_office_expenses.sql`.
+
+## 3.5. RLS multi-tenant (recomendado)
+
+Para que cada usuário veja apenas **suas** movimentações de processos e **suas** despesas, execute no SQL Editor o conteúdo de `supabase/migrations/20250225230000_rls_multi_tenant.sql`. Deve ser aplicado **depois** das migrations 3.3 e 3.4.
+
 ## 4. Deploy
 
 1. Clique em **Deploy**.
@@ -100,3 +121,39 @@ Confirme também que o projeto não está **pausado** (no free tier, projetos pa
 - Deploy e, em seguida, configurar a URL do app no Supabase (Site URL e Redirect URLs).
 
 Com isso, o projeto fica pronto para ficar online na Vercel.
+
+---
+
+## 8. Onde colocar a API do Escavador (monitoramento de processos)
+
+O monitoramento diário usa a **API do Escavador**. O token da API **não** vai na Vercel nem no frontend — vai no **Supabase**, na Edge Function que roda o cron.
+
+### Passo 1 — Token no Supabase
+
+1. Acesse o [Dashboard do Supabase](https://supabase.com/dashboard) → seu projeto.
+2. No menu lateral: **Edge Functions** (ou **Project Settings** → **Edge Functions**).
+3. Abra a função **process-monitor-cron** (ou crie/deploy primeiro; veja Passo 2).
+4. Vá em **Secrets** (ou **Project Settings** → **Edge Functions** → **Secrets**).
+5. Adicione um secret:
+   - **Name:** `ESCAVADOR_API_TOKEN`
+   - **Value:** o token que o Escavador te deu (gerado no [painel da API Escavador](https://api.escavador.com/)).
+
+Assim a função consegue chamar a API do Escavador quando rodar.
+
+### Passo 2 — Publicar a Edge Function e agendar o cron
+
+1. No seu PC, na pasta do projeto (ex.: `smart-case-mate`), instale o CLI do Supabase se ainda não tiver:  
+   `npm install -g supabase`
+2. Faça login: `supabase login`
+3. Vincule o projeto: `supabase link --project-ref SEU_PROJECT_REF` (o ref está em Supabase → Project Settings → General).
+4. Envie a função:  
+   `supabase functions deploy process-monitor-cron`
+5. Defina o secret pelo CLI (se preferir):  
+   `supabase secrets set ESCAVADOR_API_TOKEN=seu_token_aqui`
+6. Para rodar **1x por dia** (ex.: 6h), use um agendador externo:
+   - **Vercel Cron:** crie em `vercel.json` um cron que chame a URL da Edge Function (com auth) no horário desejado.
+   - Ou um serviço como [cron-job.org](https://cron-job.org) que faça um **POST** para:  
+     `https://SEU_PROJECT_REF.supabase.co/functions/v1/process-monitor-cron`  
+     com header `Authorization: Bearer SEU_ANON_KEY` (ou use a service role key só em ambiente seguro).
+
+Resumo: **rode a migration no SQL Editor (3.3)** e **coloque o token no Supabase (Edge Function Secrets)**. O app em si (Vercel) não precisa do token.

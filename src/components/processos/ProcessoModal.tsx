@@ -17,7 +17,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateProcesso, useUpdateProcesso, type Processo, type ProcessoInsert } from "@/hooks/useProcessos";
+import { useCreateProcesso, useUpdateProcesso, useProcessPlanLimit, type Processo, type ProcessoInsert } from "@/hooks/useProcessos";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeamMembers } from "@/hooks/useTeam";
 
@@ -49,6 +49,7 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
     const { user } = useAuth();
     const createMutation = useCreateProcesso();
     const updateMutation = useUpdateProcesso();
+    const { limit, currentCount, atLimit } = useProcessPlanLimit();
     const { data: teamMembers } = useTeamMembers();
     const isEditing = !!processo;
 
@@ -110,6 +111,12 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
                     <DialogTitle className="font-display text-xl">
                         {isEditing ? "Editar Processo" : "Novo Processo"}
                     </DialogTitle>
+                    {!isEditing && (
+                        <p className="text-sm text-muted-foreground">
+                            Processos no plano: {currentCount} / {limit}
+                            {atLimit && " — Limite atingido. Atualize o plano para cadastrar mais."}
+                        </p>
+                    )}
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -253,6 +260,7 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
                                 value={form.value}
                                 onChange={(e) => set("value", parseFloat(e.target.value) || 0)}
                             />
+                            <p className="text-xs text-muted-foreground">Valor em discussão no processo. Os honorários (valores cobrados ao cliente) são registrados em Financeiro.</p>
                         </div>
                     </div>
 
@@ -271,7 +279,7 @@ export default function ProcessoModal({ open, onOpenChange, processo }: Processo
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancelar
                         </Button>
-                        <Button type="submit" disabled={isPending}>
+                        <Button type="submit" disabled={isPending || (!isEditing && atLimit)}>
                             {isPending ? "Salvando..." : isEditing ? "Salvar Alterações" : "Criar Processo"}
                         </Button>
                     </DialogFooter>

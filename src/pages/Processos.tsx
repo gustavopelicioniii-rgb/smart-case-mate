@@ -24,7 +24,7 @@ import {
 import NewMeetingModal from "@/components/agenda/NewMeetingModal";
 import ProcessoModal from "@/components/processos/ProcessoModal";
 import CsvImportModal from "@/components/import/CsvImportModal";
-import { useProcessos, useProcessoStats, useDeleteProcesso, type Processo } from "@/hooks/useProcessos";
+import { useProcessos, useProcessoStats, useProcessPlanLimit, useDeleteProcesso, type Processo } from "@/hooks/useProcessos";
 
 type ProcessStatus = "Em andamento" | "Aguardando prazo" | "Concluído" | "Suspenso";
 
@@ -58,6 +58,7 @@ const Processos = () => {
 
   const { data: processos, isLoading } = useProcessos();
   const stats = useProcessoStats();
+  const { limit, currentCount, atLimit } = useProcessPlanLimit();
   const deleteMutation = useDeleteProcesso();
 
   const filtered = (processos ?? []).filter(
@@ -93,9 +94,10 @@ const Processos = () => {
             <h1 className="font-display text-3xl font-bold text-foreground">Processos</h1>
             <p className="mt-1 text-muted-foreground">Gerencie e acompanhe todos os seus processos.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <span className="text-sm text-muted-foreground hidden sm:inline">Processos: {currentCount}/{limit}</span>
             <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Importar CSV</Button>
-            <Button onClick={handleNew}><Plus className="mr-2 h-4 w-4" />Novo Processo</Button>
+            <Button onClick={handleNew} disabled={atLimit} title={atLimit ? "Limite do plano atingido" : undefined}><Plus className="mr-2 h-4 w-4" />Novo Processo</Button>
           </div>
         </div>
 
@@ -161,7 +163,7 @@ const Processos = () => {
                     <TableHead>Fase</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Próx. Prazo</TableHead>
-                    <TableHead>Valor</TableHead>
+                    <TableHead>Valor da causa</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -234,7 +236,7 @@ const Processos = () => {
                           <p className="text-xs">👤 Responsável: {p.responsible}</p>
                           <p className="text-xs">📄 Última mov.: {p.last_movement}</p>
                           <p className="text-xs">📎 {p.docs_count} documentos vinculados</p>
-                          <p className="text-xs font-semibold">💰 Valor: {formatCurrency(p.value)}</p>
+                          <p className="text-xs font-semibold">💰 Valor da causa: {formatCurrency(p.value)}</p>
                         </div>
                       </TooltipContent>
                     </Tooltip>

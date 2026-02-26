@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export type PaymentMethod = 'a_vista' | 'entrada_parcelas' | 'cartao_credito';
+
 export interface Fee {
     id: string;
     created_at: string;
@@ -14,6 +16,9 @@ export interface Fee {
     status: 'Pago' | 'Pendente' | 'Atrasado' | 'Cancelado';
     due_date: string | null;
     paid_date: string | null;
+    payment_method?: PaymentMethod;
+    entrada_value?: number | null;
+    installments?: number | null;
     owner_id: string | null;
 }
 

@@ -11,6 +11,7 @@ export interface Database {
           oab_number: string | null;
           avatar_url: string | null;
           firm_logo_url: string | null;
+          subscription_plan: 'start' | 'pro' | 'elite' | null;
           updated_at: string | null;
         };
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'id'> & { id?: string };
@@ -33,12 +34,43 @@ export interface Database {
           status: 'Em andamento' | 'Aguardando prazo' | 'Concluído' | 'Suspenso';
           next_deadline: string | null;
           last_movement: string;
+          last_checked_at?: string | null;
           value: number;
           docs_count: number;
           owner_id: string | null;
         };
         Insert: Omit<Database['public']['Tables']['processos']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['processos']['Insert']>;
+      };
+      process_movements: {
+        Row: {
+          id: string;
+          created_at: string;
+          process_id: string;
+          process_number: string;
+          movement_date: string;
+          movement_type: string;
+          full_text: string;
+          is_relevant: boolean;
+          external_id: number | null;
+          owner_id: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['process_movements']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['process_movements']['Insert']>;
+      };
+      process_monitor_logs: {
+        Row: {
+          id: string;
+          created_at: string;
+          process_id: string | null;
+          process_number: string | null;
+          log_type: 'consulta_realizada' | 'atualizacao_encontrada' | 'erro_api';
+          message: string | null;
+          details: Record<string, unknown> | null;
+          owner_id: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['process_monitor_logs']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['process_monitor_logs']['Insert']>;
       };
       deadlines: {
         Row: {
@@ -76,10 +108,29 @@ export interface Database {
           status: 'Pago' | 'Pendente' | 'Atrasado' | 'Cancelado';
           due_date: string | null;
           paid_date: string | null;
+          payment_method: 'a_vista' | 'entrada_parcelas' | 'cartao_credito';
+          entrada_value: number | null;
+          installments: number | null;
           owner_id: string | null;
         };
         Insert: Omit<Database['public']['Tables']['fees']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['fees']['Insert']>;
+      };
+      office_expenses: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          category: 'luz' | 'agua' | 'assinaturas' | 'outros';
+          description: string;
+          value: number;
+          status: 'Pago' | 'Pendente' | 'Atrasado' | 'Cancelado';
+          due_date: string | null;
+          paid_date: string | null;
+          owner_id: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['office_expenses']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['office_expenses']['Insert']>;
       };
       documents: {
         Row: {

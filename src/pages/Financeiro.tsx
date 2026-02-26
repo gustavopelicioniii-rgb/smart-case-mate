@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  DollarSign, TrendingUp, Clock, CheckCircle, Plus, Upload,
+  DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle, Plus, Upload,
   ArrowUpRight, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle,
   CreditCard, QrCode, Link2, Copy, ExternalLink, Percent, Split,
+  Zap, Droplets, FileText, Package,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import FeeModal from "@/components/financeiro/FeeModal";
+import ExpenseModal from "@/components/financeiro/ExpenseModal";
 import CsvImportModal from "@/components/import/CsvImportModal";
 import { useFees, useFeeStats, useDeleteFee, type Fee } from "@/hooks/useFees";
+import { useExpenses, useExpenseStats, useDeleteExpense, type OfficeExpense } from "@/hooks/useExpenses";
 import { useToast } from "@/hooks/use-toast";
 
 const formatCurrency = (value: number) =>
@@ -47,16 +50,25 @@ const statusBadge: Record<string, { variant: "default" | "secondary" | "destruct
   Cancelado: { variant: "outline", label: "Cancelado" },
 };
 
+const CATEGORY_ICONS: Record<string, typeof Zap> = { luz: Zap, agua: Droplets, assinaturas: FileText, outros: Package };
+const CATEGORY_LABELS: Record<string, string> = { luz: "Luz", agua: "Água", assinaturas: "Assinaturas", outros: "Outros" };
+
 const Financeiro = () => {
   const { data: fees, isLoading } = useFees();
   const stats = useFeeStats();
   const deleteMutation = useDeleteFee();
+  const { data: expenses, isLoading: expensesLoading } = useExpenses();
+  const expenseStats = useExpenseStats();
+  const deleteExpenseMutation = useDeleteExpense();
   const { toast } = useToast();
 
   const [feeModalOpen, setFeeModalOpen] = useState(false);
   const [editingFee, setEditingFee] = useState<Fee | null>(null);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<OfficeExpense | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteExpenseTarget, setDeleteExpenseTarget] = useState<string | null>(null);
   const [chargeOpen, setChargeOpen] = useState(false);
   const [chargeMethod, setChargeMethod] = useState<"pix" | "boleto" | "link">("pix");
   const [chargeClient, setChargeClient] = useState("");
@@ -75,6 +87,15 @@ const Financeiro = () => {
     } catch {
       // error handled by mutation onError
     }
+  };
+  const handleNewExpense = () => { setEditingExpense(null); setExpenseModalOpen(true); };
+  const handleEditExpense = (exp: OfficeExpense) => { setEditingExpense(exp); setExpenseModalOpen(true); };
+  const handleDeleteExpense = async () => {
+    if (!deleteExpenseTarget) return;
+    try {
+      await deleteExpenseMutation.mutateAsync(deleteExpenseTarget);
+      setDeleteExpenseTarget(null);
+    } catch {}
   };
 
   const handleGenerateCharge = () => {
@@ -101,7 +122,9 @@ const Financeiro = () => {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold text-foreground">Financeiro</h1>
-          <p className="mt-1 text-muted-foreground">Controle de honorários, cobranças e receita do escritório.</p>
+          <p className="mt-1 text-muted-foreground">Controle de honorários, cobranças, receita e despesas do escritório.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Valor da causa (processo) e valor dos honorários são diferentes: a causa fica em Processos; os honorários são os valores que o cliente paga ao escritório e aparecem aqui.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Clique na aba <strong>Despesas</strong> para ver o dashboard de gastos (luz, água, assinaturas).</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Importar CSV</Button>
@@ -221,14 +244,17 @@ const Financeiro = () => {
         </CardContent>
       </Card>
 
-      {/* Tabs: Honorários / Por Processo */}
+      {/* Tabs: Honorários / Por Processo / Despesas */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="honorarios" className="flex items-center gap-2">
             <DollarSign className="h-3.5 w-3.5" /> Honorários
           </TabsTrigger>
           <TabsTrigger value="por-processo" className="flex items-center gap-2">
             <Split className="h-3.5 w-3.5" /> Por Processo
+          </TabsTrigger>
+          <TabsTrigger value="despesas" className="flex items-center gap-2" data-state={activeTab === "despesas" ? "active" : "inactive"}>
+            <TrendingDown className="h-3.5 w-3.5" /> Despesas do escritório
           </TabsTrigger>
         </TabsList>
 
@@ -257,7 +283,7 @@ const Financeiro = () => {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Processo</TableHead>
                   <TableHead>Descrição</TableHead>
-                  <TableHead>Valor</TableHead>
+                  <TableHead>Valor do honorário</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="w-10"></TableHead>
@@ -355,7 +381,7 @@ const Financeiro = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Descrição</TableHead>
-                              <TableHead>Valor</TableHead>
+                              <TableHead>Valor do honorário</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead>Vencimento</TableHead>
                             </TableRow>
@@ -381,9 +407,136 @@ const Financeiro = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="despesas" className="mt-4 space-y-4">
+          {/* Dashboard de gastos: Luz, Água, Assinaturas, Outros */}
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle className="font-display text-xl flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5" /> Gastos do escritório
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Dashboard por categoria: Luz, Água, Assinaturas e Outros. Todas as despesas podem ser editadas ou excluídas.</p>
+              </div>
+              <Button onClick={handleNewExpense} className="shrink-0"><Plus className="mr-2 h-4 w-4" />Nova Despesa</Button>
+            </CardHeader>
+            <CardContent>
+              {(expenses ?? []).length === 0 && !expensesLoading && (
+                <div className="mb-4 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <p className="text-sm text-foreground font-medium">Nenhuma despesa registrada. Registre luz, água, assinaturas e outros gastos para ver os totais aqui.</p>
+                  <Button onClick={handleNewExpense}><Plus className="mr-2 h-4 w-4" />Nova Despesa</Button>
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {(['luz', 'agua', 'assinaturas', 'outros'] as const).map((cat) => {
+                  const Icon = CATEGORY_ICONS[cat];
+                  const { total, count } = expenseStats.byCategory[cat];
+                  return (
+                    <Card key={cat}>
+                      <CardContent className="flex items-center gap-4 p-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[cat]}</p>
+                          <p className="text-lg font-bold text-foreground">{formatCurrency(total)}</p>
+                          <p className="text-xs text-muted-foreground">{count} despesa(s)</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total geral</p>
+                      <p className="text-lg font-bold text-foreground">{formatCurrency(expenseStats.totalGeral)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <div>
+                <CardTitle className="font-display text-xl">Todas as despesas</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Clique no ícone de lápis ou duplo clique na linha para editar.</p>
+              </div>
+              <Button onClick={handleNewExpense}><Plus className="mr-2 h-4 w-4" />Nova Despesa</Button>
+            </CardHeader>
+            <CardContent>
+              {expensesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-3 text-muted-foreground">Carregando...</span>
+                </div>
+              ) : (expenses ?? []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <TrendingDown className="h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-4 text-lg font-medium text-foreground">Nenhuma despesa registrada</p>
+                  <p className="mt-1 text-sm text-muted-foreground max-w-sm">Registre luz, água, assinaturas e outros gastos. Use o botão abaixo para criar a primeira despesa.</p>
+                  <Button onClick={handleNewExpense} className="mt-4"><Plus className="mr-2 h-4 w-4" />Nova Despesa</Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead className="w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(expenses ?? []).map((e) => (
+                      <TableRow key={e.id} className="cursor-pointer" onDoubleClick={() => handleEditExpense(e)}>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5">
+                            {(() => { const Icon = CATEGORY_ICONS[e.category]; return Icon ? <Icon className="h-4 w-4 text-muted-foreground" /> : null; })()}
+                            {CATEGORY_LABELS[e.category] ?? e.category}
+                          </span>
+                        </TableCell>
+                        <TableCell>{e.description || "—"}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(e.value)}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadge[e.status]?.variant ?? "secondary"}>{e.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(e.due_date)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditExpense(e)} title="Editar despesa">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditExpense(e)}><Pencil className="mr-2 h-4 w-4" />Editar despesa</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteExpenseTarget(e.id)}><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <FeeModal key={editingFee?.id ?? "new"} open={feeModalOpen} onOpenChange={setFeeModalOpen} fee={editingFee} />
+      <ExpenseModal key={editingExpense?.id ?? "new"} open={expenseModalOpen} onOpenChange={setExpenseModalOpen} expense={editingExpense} />
       <CsvImportModal open={importOpen} onOpenChange={setImportOpen} type="fees" />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -395,6 +548,19 @@ const Financeiro = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteExpenseTarget} onOpenChange={(open) => !open && setDeleteExpenseTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Despesa</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExpense} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
