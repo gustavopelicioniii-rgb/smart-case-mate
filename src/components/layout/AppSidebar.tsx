@@ -21,28 +21,29 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
+import { useMyPermissions } from "@/hooks/useTeam";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useMemo } from "react";
 import { format } from "date-fns";
 
-const mainNavItems = [
+const mainNavItems: Array<{ name: string; href: string; icon: React.ElementType; iconSrc?: string; badge?: boolean; useCount?: boolean; module?: string }> = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, iconSrc: "/icons/dashboard.svg" },
-  { name: "Processos", href: "/processos", icon: Scale, iconSrc: "/icons/scale.svg" },
-  { name: "Agenda", href: "/agenda", icon: Calendar, useCount: true },
-  { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true },
-  { name: "CRM", href: "/crm", icon: Users },
+  { name: "Processos", href: "/processos", icon: Scale, iconSrc: "/icons/scale.svg", module: "processos" },
+  { name: "Agenda", href: "/agenda", icon: Calendar, useCount: true, module: "agenda" },
+  { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: true, module: "pecas" },
+  { name: "CRM", href: "/crm", icon: Users, module: "crm" },
   { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle, iconSrc: "/icons/whatsapp.svg" },
-  { name: "Financeiro", href: "/financeiro", icon: DollarSign },
+  { name: "Financeiro", href: "/financeiro", icon: DollarSign, module: "financeiro" },
 ];
 
-const secondaryNav = [
+const secondaryNav: Array<{ name: string; href: string; icon: React.ElementType; iconSrc?: string; module?: string; adminOnly?: boolean }> = [
   { name: "Calculadora Jurídica", href: "/calculadora", icon: Calculator, iconSrc: "/icons/calculator.svg" },
-  { name: "Documentos", href: "/documentos", icon: FolderOpen },
-  { name: "Publicações", href: "/publicacoes", icon: Newspaper },
-  { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
-  { name: "Equipe", href: "/equipe", icon: UsersRound },
-  { name: "Configurações", href: "/configuracoes", icon: Settings },
+  { name: "Documentos", href: "/documentos", icon: FolderOpen, module: "documentos" },
+  { name: "Publicações", href: "/publicacoes", icon: Newspaper, module: "publicacoes" },
+  { name: "Relatórios", href: "/relatorios", icon: BarChart3, module: "relatorios" },
+  { name: "Equipe", href: "/equipe", icon: UsersRound, adminOnly: true },
+  { name: "Configurações", href: "/configuracoes", icon: Settings, module: "configuracoes" },
 ];
 
 function getMainNav(todayCount: number) {
@@ -62,6 +63,8 @@ type NavItemType = {
   iconSrc?: string;
   badge?: boolean;
   count?: number;
+  module?: string;
+  adminOnly?: boolean;
 };
 
 const NavItem = ({ item, isActive }: { item: NavItemType; isActive: boolean }) => (
@@ -103,6 +106,7 @@ const AppSidebar = () => {
   const location = useLocation();
   const { user, role, signOut } = useAuth();
   const { data: profile } = useProfile();
+  const { isAdmin, byModule } = useMyPermissions();
   const { events: gcalEvents } = useGoogleCalendar();
   const todayCount = useMemo(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -113,7 +117,21 @@ const AppSidebar = () => {
       return format(d, "yyyy-MM-dd") === todayStr;
     }).length;
   }, [gcalEvents]);
-  const mainNav = getMainNav(todayCount);
+  const mainNav = useMemo(() => {
+    const list = getMainNav(todayCount);
+    return list.filter((item) => {
+      if ("adminOnly" in item && item.adminOnly && !isAdmin) return false;
+      if ("module" in item && item.module && !byModule(item.module).can_view) return false;
+      return true;
+    });
+  }, [todayCount, isAdmin, byModule]);
+  const secondaryNavFiltered = useMemo(() => {
+    return secondaryNav.filter((item) => {
+      if (item.adminOnly && !isAdmin) return false;
+      if (item.module && !byModule(item.module).can_view) return false;
+      return true;
+    });
+  }, [isAdmin, byModule]);
   const isActive = (href: string) =>
     href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
 
@@ -163,7 +181,7 @@ const AppSidebar = () => {
           <p className="px-3.5 mb-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-foreground/55">
             Ferramentas
           </p>
-          {secondaryNav.map((item) => (
+          {secondaryNavFiltered.map((item) => (
             <NavItem key={item.name} item={item} isActive={isActive(item.href)} />
           ))}
         </div>

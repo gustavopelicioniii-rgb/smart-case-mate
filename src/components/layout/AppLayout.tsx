@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import AppSidebar from "./AppSidebar";
 import MobileHeader from "./MobileHeader";
 import MobileBottomNav from "./MobileBottomNav";
+import PermissionRedirect from "@/components/PermissionRedirect";
 
 const AppLayout = () => {
   return (
@@ -22,7 +23,8 @@ const AppLayout = () => {
 
       {/* Main content — min-w-0 + overflow-x-hidden evitam barra de rolagem horizontal */}
       <main id="main-content" className="min-w-0 w-full overflow-x-hidden lg:pl-[272px]" tabIndex={-1}>
-        <div className="w-full min-w-0 max-w-full p-4 pb-24 lg:px-10 lg:py-8 lg:pb-8">
+        <PermissionRedirect />
+        <div className="w-full min-w-0 max-w-full p-4 pb-24 lg:px-10 lg:py-8 lg:pb-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
           <Outlet />
         </div>
       </main>

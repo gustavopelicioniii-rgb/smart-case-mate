@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface TeamMember {
     id: string;
@@ -38,8 +39,37 @@ export function useTeamMembers() {
             if (error) throw error;
             return data as TeamMember[];
         },
-        staleTime: 5 * 60 * 1000,
+        staleTime: 2 * 60 * 1000,
+        refetchOnWindowFocus: true,
     });
+}
+
+/** Permissões do usuário logado (para esconder menu e bloquear rotas). Admin tem acesso total. */
+export function useMyPermissions() {
+    const { user, role } = useAuth();
+    const userId = user?.id ?? null;
+    const isAdmin = role === 'admin';
+    const { data: perms } = useQuery({
+        queryKey: ['user-permissions', userId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('user_permissions')
+                .select('module, can_view, can_edit')
+                .eq('user_id', userId!);
+            if (error) return [];
+            return (data ?? []) as UserPermission[];
+        },
+        enabled: !!userId && !isAdmin,
+    });
+    const byModule = (module: string): { can_view: boolean; can_edit: boolean } => {
+        if (isAdmin) return { can_view: true, can_edit: true };
+        const p = perms?.find((x) => x.module === module);
+        return {
+            can_view: p?.can_view ?? true,
+            can_edit: p?.can_edit ?? false,
+        };
+    };
+    return { isAdmin, byModule, permissions: perms ?? [] };
 }
 
 export function useUserPermissions(userId: string) {

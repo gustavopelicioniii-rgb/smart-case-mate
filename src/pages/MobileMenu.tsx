@@ -11,7 +11,7 @@ import { useProfile } from "@/hooks/useProfile";
 
 const menuItems = [
     { name: "Gerador de Peças", href: "/pecas", icon: FileText, badge: "IA" },
-    { name: "Calculadora Jurídica", href: "/calculadora", icon: Calculator },
+    { name: "Calculadora Jurídica", href: "/calculadora", icon: Calculator, iconSrc: "/icons/calculator.svg" },
     { name: "WhatsApp", href: "/whatsapp", icon: MessageCircle, iconSrc: "/icons/whatsapp.svg" },
     { name: "Financeiro", href: "/financeiro", icon: DollarSign },
     { name: "Documentos", href: "/documentos", icon: FolderOpen },

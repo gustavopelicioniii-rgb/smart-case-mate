@@ -311,21 +311,23 @@ const ProcessoDetail = () => {
     }
 
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate("/processos")}>
-                    <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <h1 className="font-display text-2xl font-bold">{processo.number}</h1>
-                        <Badge variant={processo.status === "Concluído" ? "secondary" : "default"}>
-                            {processo.status}
-                        </Badge>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 min-w-0 w-full max-w-full overflow-x-hidden">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate("/processos")}>
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="font-display text-xl sm:text-2xl font-bold truncate">{processo.number}</h1>
+                            <Badge variant={processo.status === "Concluído" ? "secondary" : "default"} className="shrink-0">
+                                {processo.status}
+                            </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{processo.client} • {processo.court}</p>
                     </div>
-                    <p className="text-muted-foreground">{processo.client} • {processo.court}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => setAndamentoOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" /> Novo Andamento
                     </Button>
@@ -342,13 +344,13 @@ const ProcessoDetail = () => {
                 </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-3 min-w-0">
                 {/* Lado Esquerdo: Info Resumida */}
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
+                <div className="space-y-6 min-w-0">
+                    <Card className="min-w-0 overflow-hidden">
+                        <CardHeader className="min-w-0">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
-                                <Hash className="h-4 w-4" /> Detalhes do Caso
+                                <Hash className="h-4 w-4 shrink-0" /> Detalhes do Caso
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -373,13 +375,13 @@ const ProcessoDetail = () => {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
+                    <Card className="min-w-0 overflow-hidden">
+                        <CardHeader className="min-w-0">
                             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
-                                <User className="h-4 w-4" /> Partes Envolvidas
+                                <User className="h-4 w-4 shrink-0" /> Partes Envolvidas
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 min-w-0">
                             <div>
                                 <Label className="text-[10px] text-info uppercase">Polo Ativo</Label>
                                 <p className="text-sm font-medium">{processo.active_party || processo.client}</p>

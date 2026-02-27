@@ -86,41 +86,47 @@ const CorrecaoValores = () => {
 
     setLoading(true);
     setResultado(null);
+    const body = {
+      valorInicial: valor,
+      dataInicial: dIni,
+      dataFinal: dFim,
+      indice,
+      tipoJuros,
+      percentualMensal: percentualMensal ? parseFloat(percentualMensal.replace(",", ".")) : undefined,
+    };
+    const invokeCalc = async (): Promise<unknown> => {
+      const { data, error: fnError } = await supabase.functions.invoke("calculadora-correcao", { body });
+      if (fnError) throw new Error(fnError.message ?? "Erro ao chamar a calculadora.");
+      return data;
+    };
     try {
-      // Chamada direta por fetch (sem x-client-info) para evitar bloqueio CORS no preflight
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error("VITE_SUPABASE_URL não configurada.");
+      await supabase.auth.refreshSession();
       const { data: { session } } = await supabase.auth.getSession();
-      const token = (session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
-      if (!token) {
-        toast.error("Não foi possível acessar o serviço. Faça login ou verifique a configuração do Supabase (VITE_SUPABASE_ANON_KEY).");
+      if (!session?.access_token && !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        toast.error("Não foi possível acessar o serviço. Faça login ou verifique VITE_SUPABASE_ANON_KEY.");
         setLoading(false);
         return;
       }
-      const res = await fetch(`${supabaseUrl}/functions/v1/calculadora-correcao`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          valorInicial: valor,
-          dataInicial: dIni,
-          dataFinal: dFim,
-          indice,
-          tipoJuros,
-          percentualMensal: percentualMensal ? parseFloat(percentualMensal.replace(",", ".")) : undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === "string" ? data.error : data?.error?.message ?? res.statusText;
-        throw new Error(msg || `Erro ${res.status}`);
+      let data: unknown;
+      try {
+        data = await invokeCalc();
+      } catch (firstErr) {
+        const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+        const isAuthOrNetwork = /401|unauthorized|JWT|failed to fetch|network|CORS/i.test(firstMsg);
+        if (isAuthOrNetwork) {
+          await supabase.auth.refreshSession();
+          data = await invokeCalc();
+        } else {
+          throw firstErr;
+        }
       }
-      if (data?.error) throw new Error(data.error);
-
-      const resultadoData = data as CorrecaoValoresResult;
-      setResultado(resultadoData);
+      const resultadoData = (data ?? null) as CorrecaoValoresResult | { error?: string } | null;
+      if (!resultadoData || "error" in resultadoData) {
+        throw new Error(typeof (resultadoData as { error?: string })?.error === "string"
+          ? (resultadoData as { error: string }).error
+          : "Resposta vazia ou inválida da calculadora.");
+      }
+      setResultado(resultadoData as CorrecaoValoresResult);
 
       const parametros = {
         valorInicial: valor,
@@ -130,7 +136,7 @@ const CorrecaoValores = () => {
         tipoJuros,
         percentualMensal: percentualMensal || null,
       };
-      const resultadoJson = data as Record<string, unknown>;
+      const resultadoJson = resultadoData as Record<string, unknown>;
       const payloadIntegridade = JSON.stringify({ parametros, resultado: resultadoJson });
       const hashIntegridade = await sha256Hex(payloadIntegridade);
       const { data: inserted, error: insertErr } = await supabase
@@ -153,7 +159,7 @@ const CorrecaoValores = () => {
           await supabase.from("calculo_logs").insert({
             calculo_id: inserted.id,
             evento: "criacao",
-            detalhes: { source: "correcao_valores", valorFinal: (data as { valorFinal?: number })?.valorFinal },
+            detalhes: { source: "correcao_valores", valorFinal: (resultadoData as { valorFinal?: number })?.valorFinal },
           });
         }
         toast.success("Cálculo realizado e salvo.");
@@ -161,9 +167,12 @@ const CorrecaoValores = () => {
       queryClient.invalidateQueries({ queryKey: ["calculos"] });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro ao calcular.";
-      if (msg.includes("Edge Function") || msg.includes("Failed to send")) {
+      const lower = msg.toLowerCase();
+      if (/401|unauthorized|JWT/.test(lower)) {
+        toast.error("Sessão expirada ou não autorizada. Faça login novamente e tente o cálculo de novo.");
+      } else if (/failed to fetch|network|CORS|edge function|relay/i.test(lower)) {
         toast.error(
-          "Não foi possível chamar a calculadora. Confira: (1) está logado no sistema; (2) a URL do Supabase no ambiente é do mesmo projeto onde a função foi publicada; (3) no Supabase, Edge Functions → calculadora-correcao está publicada."
+          "Não foi possível chamar a calculadora. Confira: (1) está logado; (2) VITE_SUPABASE_URL é do mesmo projeto onde a Edge Function foi publicada; (3) no Supabase, Edge Functions → calculadora-correcao está publicada. Detalhe: " + (msg.slice(0, 80) || "erro de rede.")
         );
       } else {
         toast.error(msg);

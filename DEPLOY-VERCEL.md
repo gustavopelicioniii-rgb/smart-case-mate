@@ -2,6 +2,14 @@
 
 O projeto está pronto para subir na Vercel. Siga os passos abaixo.
 
+## Atualização no celular (cache)
+
+Depois de um novo deploy, se no **celular** a versão não atualizar (temas, fontes, menu, Calculadora Jurídica):
+
+- **Android (Chrome):** abra o menu (⋮) → **Configurações** → **Privacidade e segurança** → **Limpar dados de navegação** → marque "Imagens e arquivos em cache" → Limpar. Ou abra o site em uma **aba anônima** para testar a versão nova.
+- **iOS (Safari):** Ajustes → Safari → Limpar Histórico e Dados de Websites. Ou use **Adicionar à tela de início** e abra pelo ícone (às vezes carrega a versão mais recente).
+- O servidor envia cabeçalhos para o navegador não guardar cache do `index.html`, então em visitas seguintes o app deve atualizar; em alguns aparelhos é necessário limpar o cache uma vez após o deploy.
+
 ## 1. Conta e repositório
 
 - Crie uma conta em [vercel.com](https://vercel.com) (ou use GitHub/GitLab).
@@ -100,6 +108,66 @@ Depois disso, ao preencher o formulário em **Calculadora Jurídica** → **Corr
 **Observação:** Não use `npm install -g supabase` — a instalação global do CLI não é mais suportada. Use sempre `npx supabase` na pasta do projeto.
 
 **Resumo:** Passo 2 = rodar a migration no SQL Editor; Passo 3 = `npx supabase login`, depois `npx supabase link --project-ref XXX`, depois `npx supabase functions deploy calculadora-correcao`.
+
+**Erro 401 ao clicar em "Realizar Cálculo":** O app agora atualiza a sessão antes de chamar a Edge Function e usa o cliente Supabase (headers corretos). Se ainda aparecer 401, faça logout e login novamente e tente de novo; confira também que a Edge Function `calculadora-correcao` está publicada no mesmo projeto cuja URL está em `VITE_SUPABASE_URL`.
+
+## 3.7. Equipe: perfis automáticos e permissões
+
+Para que **todos os usuários convidados apareçam na Equipe** (para o administrador) e para usar **limites de visualização por módulo**:
+
+1. No Supabase → **SQL Editor**, execute o conteúdo de `supabase/migrations/20250226100000_profiles_trigger_and_admin_rls.sql` (trigger que cria perfil ao cadastrar usuário; RLS para só admin ver todos os perfis).
+2. Execute também o conteúdo de `supabase/migrations/20250226110000_user_permissions_table.sql` (tabela de permissões por módulo, se ainda não existir).
+
+Assim, quando alguém for convidado e confirmar o e-mail, o perfil será criado e listado na Equipe. Apenas administradores veem a lista completa; na página Equipe você define por membro o que cada um pode **ver** e **editar** em cada módulo.
+
+## 3.8. Logo do escritório (Storage) — se der "Erro ao enviar logo" ou RLS no Storage
+
+Para que o upload da **logo do escritório** (Configurações) funcione, o bucket `documents` precisa permitir que usuários autenticados enviem arquivos na pasta `logos/<id do usuário>/`. Se ao *salvar* a URL da logo aparecer erro de RLS na tabela `profiles`, execute também no SQL Editor o conteúdo de `supabase/migrations/20250226120000_profiles_update_own.sql` (permite que o usuário atualize o próprio perfil).
+
+### Opção A — Rodar a migration (recomendado)
+
+1. No Supabase → **SQL Editor**, abra uma nova query.
+2. Copie **todo** o conteúdo do arquivo `supabase/migrations/20250226130000_storage_logos_policy.sql`.
+3. Cole no editor e clique em **Run**.
+4. Deve aparecer "Success". As políticas de Storage para a pasta `logos/` passam a valer.
+
+### Opção B — Criar as políticas pelo Dashboard (passo a passo)
+
+1. Acesse o [Supabase](https://supabase.com/dashboard) e abra seu projeto.
+2. No menu da esquerda, clique em **Storage**.
+3. Clique no bucket **documents** (se não existir, crie um bucket chamado `documents` e marque **Public** se quiser que as logos sejam acessíveis por URL pública).
+4. Abra a aba **Policies** (ou **Policies** no topo da página do bucket).
+5. Clique em **New Policy** (ou **Create policy**).
+6. **Upload (INSERT):**
+   - **Policy name:** `Users can upload own logo in documents/logos`
+   - **Allowed operation:** `INSERT` (ou "Insert").
+   - **Target roles:** `authenticated`.
+   - **Policy definition:** "Use this template" → **Custom** e use a expressão:
+     - **WITH CHECK expression:**  
+       `bucket_id = 'documents' and (storage.foldername(name))[1] = 'logos' and (storage.foldername(name))[2] = (select auth.uid()::text)`
+   - Salve.
+7. **Leitura (SELECT):** Crie outra política:
+   - **Policy name:** `Users can read own logos in documents`
+   - **Allowed operation:** `SELECT`
+   - **Target roles:** `authenticated`
+   - **USING expression:**  
+     `bucket_id = 'documents' and (storage.foldername(name))[1] = 'logos' and (storage.foldername(name))[2] = (select auth.uid()::text)`
+   - Salve.
+8. **Atualização (UPDATE)** e **Remoção (DELETE):** Se a interface permitir, crie políticas análogas para `UPDATE` e `DELETE` com a mesma condição (bucket `documents`, pasta `logos/`, e segundo segmento da pasta = `auth.uid()::text`). Caso contrário, use a **Opção A** (migration) que já inclui INSERT, SELECT, UPDATE e DELETE.
+
+Assim, cada usuário só envia, lê, atualiza e remove arquivos em `documents/logos/<próprio id>/`, e o "Erro ao enviar logo" por política de Storage deixa de ocorrer.
+
+**Se ainda tiver problema com logo ou com a Calculadora (ex.: 401, RLS, recursão), use o checklist:** `CHECKLIST-LOGO-E-CALCULADORA.md`.
+
+### Se aparecer "infinite recursion detected in policy for relation profiles"
+
+Isso ocorre quando a política de SELECT em `profiles` (seção 3.7) está ativa e o sistema tenta atualizar o perfil (ex.: ao salvar a URL da logo). Corrija assim:
+
+1. No Supabase → **SQL Editor**, abra uma nova query.
+2. Copie **todo** o conteúdo do arquivo `supabase/migrations/20250226140000_profiles_rls_no_recursion.sql`.
+3. Cole no editor e clique em **Run**.
+
+Essa migration cria a função `is_admin()` e ajusta a política de leitura de `profiles` para evitar recursão. Depois disso, o upload da logo deve funcionar normalmente.
 
 ## 4. Deploy
 
