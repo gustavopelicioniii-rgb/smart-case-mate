@@ -140,3 +140,17 @@ export function useUpdateAgendaEvent() {
     },
   });
 }
+
+export function useDeleteAgendaEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("agenda_events").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agenda_events"] });
+      queryClient.refetchQueries({ queryKey: ["agenda_events"] });
+    },
+  });
+}

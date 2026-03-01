@@ -13,6 +13,16 @@ export interface Database {
           firm_logo_url: string | null;
           subscription_plan: 'start' | 'pro' | 'elite' | null;
           updated_at: string | null;
+          profissao: string | null;
+          oab_state: string | null;
+          estado: string | null;
+          endereco: string | null;
+          numero: string | null;
+          cpf: string | null;
+          cep: string | null;
+          cidade: string | null;
+          bairro: string | null;
+          complemento: string | null;
         };
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'id'> & { id?: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -131,6 +141,17 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['office_expenses']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['office_expenses']['Insert']>;
+      };
+      office_expense_category_settings: {
+        Row: {
+          id: string;
+          owner_id: string;
+          category: 'luz' | 'agua' | 'assinaturas' | 'outros';
+          display_name: string;
+          budget_value: number;
+        };
+        Insert: Omit<Database['public']['Tables']['office_expense_category_settings']['Row'], 'id'> & { id?: string };
+        Update: Partial<Database['public']['Tables']['office_expense_category_settings']['Row']>;
       };
       documents: {
         Row: {

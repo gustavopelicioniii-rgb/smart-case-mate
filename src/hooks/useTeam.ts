@@ -179,3 +179,34 @@ export function useInviteUser() {
         },
     });
 }
+
+/** Sincroniza contas: cria perfis para usuários de auth.users que ainda não têm. Apenas admin. */
+export function useSyncProfilesFromAuth() {
+    const qc = useQueryClient();
+    const { toast } = useToast();
+    return useMutation({
+        mutationFn: async () => {
+            const { data, error } = await supabase.rpc('sync_profiles_from_auth');
+            if (error) throw error;
+            return (data as number) ?? 0;
+        },
+        onSuccess: (count) => {
+            qc.invalidateQueries({ queryKey: ['team-members'] });
+            qc.refetchQueries({ queryKey: ['team-members'] });
+            if (count > 0) {
+                toast({
+                    title: 'Contas sincronizadas!',
+                    description: `${count} perfil(is) criado(s). Agora você pode definir prioridades na lista.`,
+                });
+            } else {
+                toast({
+                    title: 'Lista atualizada',
+                    description: 'Todas as contas já estavam na equipe. Nenhum perfil novo criado.',
+                });
+            }
+        },
+        onError: (e: Error) => {
+            toast({ title: 'Erro ao sincronizar', description: e.message, variant: 'destructive' });
+        },
+    });
+}

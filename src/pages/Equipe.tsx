@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
     Users, UserPlus, Shield, Eye, Pencil, Loader2, ChevronDown, ChevronUp,
-    Save, Mail,
+    Save, Mail, Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import {
     useTeamMembers, useUserPermissions, useUpdateUserRole,
-    useUpdatePermission, useInviteUser,
+    useUpdatePermission, useInviteUser, useSyncProfilesFromAuth,
     type TeamMember,
 } from "@/hooks/useTeam";
 import { useAuth } from "@/contexts/AuthContext";
@@ -164,6 +164,7 @@ function MemberPermissions({ member }: { member: TeamMember }) {
 const Equipe = () => {
     const { data: members, isLoading } = useTeamMembers();
     const inviteUser = useInviteUser();
+    const syncProfiles = useSyncProfilesFromAuth();
     const [inviteOpen, setInviteOpen] = useState(false);
     const [inviteName, setInviteName] = useState("");
     const [inviteEmail, setInviteEmail] = useState("");
@@ -186,16 +187,31 @@ const Equipe = () => {
 
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl">
-            <div className="flex items-end justify-between">
+            <div className="flex items-end justify-between gap-3 flex-wrap">
                 <div>
                     <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">Equipe</h1>
                     <p className="mt-1 text-sm sm:text-base text-muted-foreground">
                         Gerencie os membros e defina o nível de acesso de cada um.
                     </p>
                 </div>
-                <Button onClick={() => setInviteOpen(true)}>
-                    <UserPlus className="mr-2 h-4 w-4" />Convidar
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => syncProfiles.mutate()}
+                        disabled={syncProfiles.isPending}
+                        title="Sincronizar contas existentes no banco para visualizar quem tem conta e definir prioridades"
+                    >
+                        {syncProfiles.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4" />
+                        )}
+                        <span className="ml-2 hidden sm:inline">Sincronizar contas</span>
+                    </Button>
+                    <Button onClick={() => setInviteOpen(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" />Convidar
+                    </Button>
+                </div>
             </div>
 
             {/* Team members list */}

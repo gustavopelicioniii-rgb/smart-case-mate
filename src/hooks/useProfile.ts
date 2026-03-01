@@ -22,6 +22,16 @@ export interface Profile {
     firm_logo_url: string | null;
     subscription_plan?: SubscriptionPlan | null;
     updated_at: string | null;
+    profissao?: string | null;
+    oab_state?: string | null;
+    estado?: string | null;
+    endereco?: string | null;
+    numero?: string | null;
+    cpf?: string | null;
+    cep?: string | null;
+    cidade?: string | null;
+    bairro?: string | null;
+    complemento?: string | null;
 }
 
 export function getPlanProcessLimit(plan: SubscriptionPlan | null | undefined): number {
@@ -80,6 +90,40 @@ export async function changePassword(newPassword: string) {
 
 const LOGOS_BUCKET = 'documents';
 const LOGOS_PREFIX = 'logos';
+const AVATARS_PREFIX = 'avatars';
+
+export function useUploadAvatar() {
+    const qc = useQueryClient();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const updateProfile = useUpdateProfile();
+
+    return useMutation({
+        mutationFn: async (file: File) => {
+            if (!user) throw new Error('Não autenticado');
+            const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+            if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+                throw new Error('Use uma imagem (PNG, JPG, GIF, WebP ou SVG).');
+            }
+            const path = `${AVATARS_PREFIX}/${user.id}/avatar.${ext}`;
+            const { error: uploadError } = await supabase.storage
+                .from(LOGOS_BUCKET)
+                .upload(path, file, { upsert: true, contentType: file.type });
+            if (uploadError) throw new Error(`Storage: ${uploadError.message}`);
+            const { data: urlData } = supabase.storage.from(LOGOS_BUCKET).getPublicUrl(path);
+            const publicUrl = urlData.publicUrl;
+            await updateProfile.mutateAsync({ avatar_url: publicUrl, silent: true });
+            return publicUrl;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['profile'] });
+            toast({ title: 'Foto do perfil atualizada!' });
+        },
+        onError: (e: Error) => {
+            toast({ title: 'Erro ao enviar foto', description: e.message, variant: 'destructive' });
+        },
+    });
+}
 
 export function useUploadFirmLogo() {
     const qc = useQueryClient();

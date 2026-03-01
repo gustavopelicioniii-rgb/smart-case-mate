@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-    User, Lock, Key, Palette, Save, Loader2, Eye, EyeOff,
-    Shield, LogOut, MessageCircle, CreditCard, PenTool, Image, Trash2,
+    User, Lock, Key, Save, Loader2, Eye, EyeOff,
+    Shield, LogOut, MessageCircle, CreditCard, PenTool, Image, Trash2, Camera,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,15 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useProfile, useUpdateProfile, changePassword, useUploadFirmLogo, useRemoveFirmLogo } from "@/hooks/useProfile";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useProfile, useUpdateProfile, changePassword, useUploadFirmLogo, useRemoveFirmLogo, useUploadAvatar } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useWhatsAppConfig, useSaveWhatsAppConfig } from "@/hooks/useWhatsApp";
+
+const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
+const PROFISSOES = ["Advogado", "Advogada", "Estagiário", "Estagiária", "Outro"];
+const ESTADOS_BR = ["Acre", "Alagoas", "Amapá", "Amazonas", "Bahia", "Ceará", "Distrito Federal", "Espírito Santo", "Goiás", "Maranhão", "Mato Grosso", "Mato Grosso do Sul", "Minas Gerais", "Pará", "Paraíba", "Paraná", "Pernambuco", "Piauí", "Rio de Janeiro", "Rio Grande do Norte", "Rio Grande do Sul", "Rondônia", "Roraima", "Santa Catarina", "São Paulo", "Sergipe", "Tocantins"];
 
 const Configuracoes = () => {
     const { user, role, signOut } = useAuth();
@@ -25,11 +30,22 @@ const Configuracoes = () => {
     const updateProfile = useUpdateProfile();
     const uploadFirmLogo = useUploadFirmLogo();
     const removeFirmLogo = useRemoveFirmLogo();
+    const uploadAvatar = useUploadAvatar();
     const { toast } = useToast();
 
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
     const [oabNumber, setOabNumber] = useState("");
+    const [profissao, setProfissao] = useState("");
+    const [oabState, setOabState] = useState("");
+    const [estado, setEstado] = useState("");
+    const [endereco, setEndereco] = useState("");
+    const [numero, setNumero] = useState("");
+    const [cpf, setCpf] = useState("");
+    const [cep, setCep] = useState("");
+    const [cidade, setCidade] = useState("");
+    const [bairro, setBairro] = useState("");
+    const [complemento, setComplemento] = useState("");
     const [profileLoaded, setProfileLoaded] = useState(false);
 
     useEffect(() => {
@@ -37,6 +53,16 @@ const Configuracoes = () => {
             setFullName(profile.full_name ?? "");
             setPhone(profile.phone ?? "");
             setOabNumber(profile.oab_number ?? "");
+            setProfissao(profile.profissao ?? "");
+            setOabState(profile.oab_state ?? "");
+            setEstado(profile.estado ?? "");
+            setEndereco(profile.endereco ?? "");
+            setNumero(profile.numero ?? "");
+            setCpf(profile.cpf ?? "");
+            setCep(profile.cep ?? "");
+            setCidade(profile.cidade ?? "");
+            setBairro(profile.bairro ?? "");
+            setComplemento(profile.complemento ?? "");
             setProfileLoaded(true);
         }
     }, [profile, profileLoaded]);
@@ -87,6 +113,16 @@ const Configuracoes = () => {
                 full_name: fullName,
                 phone,
                 oab_number: oabNumber,
+                profissao: profissao || null,
+                oab_state: oabState || null,
+                estado: estado || null,
+                endereco: endereco || null,
+                numero: numero || null,
+                cpf: cpf || null,
+                cep: cep || null,
+                cidade: cidade || null,
+                bairro: bairro || null,
+                complemento: complemento || null,
             });
         } catch {
             // error handled by mutation onError
@@ -190,94 +226,213 @@ const Configuracoes = () => {
     const pInfo = providerInfo[waProvider];
 
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl">
             <div>
-                <h1 className="font-display text-3xl font-bold text-foreground">Configurações</h1>
-                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, segurança e preferências.</p>
+                <h1 className="font-display text-3xl font-bold text-foreground">Atualize seus dados</h1>
+                <p className="mt-1 text-muted-foreground">Gerencie seu perfil, assinatura, senha e cartões.</p>
             </div>
 
-            {/* Profile Section */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <User className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <CardTitle className="font-display text-lg">Perfil</CardTitle>
-                            <CardDescription>Informações pessoais e profissionais</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-                            {(fullName || user?.email || "U").charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <p className="text-lg font-semibold">{fullName || "Sem nome"}</p>
-                            <p className="text-sm text-muted-foreground">{user?.email}</p>
-                            <Badge variant="secondary" className="mt-1">
-                                <Shield className="mr-1 h-3 w-3" />
-                                {role === "admin" ? "Administrador" : "Advogado"}
-                            </Badge>
-                        </div>
-                    </div>
+            <Tabs defaultValue="informacoes" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 h-auto p-1 gap-1 bg-muted">
+                    <TabsTrigger value="informacoes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        Informações
+                    </TabsTrigger>
+                    <TabsTrigger value="assinatura">Assinatura</TabsTrigger>
+                    <TabsTrigger value="senha">Alterar Senha</TabsTrigger>
+                    <TabsTrigger value="cartoes">Cartões</TabsTrigger>
+                </TabsList>
 
-                    <Separator />
+                <TabsContent value="informacoes" className="mt-4">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex flex-col sm:flex-row gap-6">
+                                <div className="flex flex-col items-center gap-2 shrink-0">
+                                    <label className="relative cursor-pointer block">
+                                        <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-border bg-primary flex items-center justify-center text-3xl font-bold text-primary-foreground">
+                                            {profile?.avatar_url ? (
+                                                <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                                            ) : (
+                                                (fullName || user?.email || "U").charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                        <span className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground border-2 border-background">
+                                            <Camera className="h-4 w-4" />
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                                            className="sr-only"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) uploadAvatar.mutate(file);
+                                                e.target.value = "";
+                                            }}
+                                            disabled={uploadAvatar.isPending}
+                                        />
+                                    </label>
+                                    <span className="text-xs text-muted-foreground">Alterar foto</span>
+                                </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="fullName">Nome Completo</Label>
-                            <Input
-                                id="fullName"
-                                placeholder="Dr. João Silva"
-                                value={fullName}
-                                onChange={(e) => setFullName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                value={user?.email ?? ""}
-                                disabled
-                                className="opacity-60"
-                            />
-                            <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
-                        </div>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">Telefone</Label>
-                            <Input
-                                id="phone"
-                                placeholder="(11) 99999-9999"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="oab">Nº OAB</Label>
-                            <Input
-                                id="oab"
-                                placeholder="123456/SP"
-                                value={oabNumber}
-                                onChange={(e) => setOabNumber(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={handleSaveProfile} disabled={updateProfile.isPending}>
-                            {updateProfile.isPending ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</>
-                            ) : (
-                                <><Save className="mr-2 h-4 w-4" />Salvar Perfil</>
-                            )}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+                                <div className="flex-1 grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="profissao">Profissão <span className="text-destructive">*</span></Label>
+                                        <Select value={profissao || undefined} onValueChange={setProfissao}>
+                                            <SelectTrigger id="profissao"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                            <SelectContent>
+                                                {PROFISSOES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="fullName">Nome completo <span className="text-destructive">*</span></Label>
+                                        <Input id="fullName" placeholder="Seu nome" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2 sm:col-span-2">
+                                        <Label htmlFor="email">E-mail</Label>
+                                        <Input id="email" value={user?.email ?? ""} disabled className="opacity-60" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="oab_state">Estado da OAB</Label>
+                                        <Select value={oabState || undefined} onValueChange={setOabState}>
+                                            <SelectTrigger id="oab_state"><SelectValue placeholder="UF" /></SelectTrigger>
+                                            <SelectContent>
+                                                {UFS.map((uf) => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="estado">Estado</Label>
+                                        <Select value={estado || undefined} onValueChange={setEstado}>
+                                            <SelectTrigger id="estado"><SelectValue placeholder="Estado" /></SelectTrigger>
+                                            <SelectContent>
+                                                {ESTADOS_BR.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="endereco">Endereço</Label>
+                                        <Input id="endereco" placeholder="Rua, avenida" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="numero">Número <span className="text-destructive">*</span></Label>
+                                        <Input id="numero" placeholder="Nº" value={numero} onChange={(e) => setNumero(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cpf">CPF <span className="text-destructive">*</span></Label>
+                                        <Input id="cpf" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Telefone</Label>
+                                        <Input id="phone" placeholder="(11) 99999-9999" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="oab">Nº da OAB</Label>
+                                        <Input id="oab" placeholder="123456" value={oabNumber} onChange={(e) => setOabNumber(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cep">CEP</Label>
+                                        <Input id="cep" placeholder="00000-000" value={cep} onChange={(e) => setCep(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cidade">Cidade</Label>
+                                        <Input id="cidade" placeholder="Cidade" value={cidade} onChange={(e) => setCidade(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="bairro">Bairro</Label>
+                                        <Input id="bairro" placeholder="Bairro" value={bairro} onChange={(e) => setBairro(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2 sm:col-span-2">
+                                        <Label htmlFor="complemento">Complemento</Label>
+                                        <Input id="complemento" placeholder="Apto, bloco" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-center sm:justify-end mt-6">
+                                <Button onClick={handleSaveProfile} disabled={updateProfile.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto min-w-[120px]">
+                                    {updateProfile.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</> : <>SALVAR</>}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="assinatura" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="font-display text-lg">Assinatura</CardTitle>
+                            <CardDescription>Seu plano atual e renovação.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-sm">
+                                    {profile?.subscription_plan ? String(profile.subscription_plan).toUpperCase() : "Start"}
+                                </Badge>
+                                <span className="text-muted-foreground text-sm">Plano ativo</span>
+                            </div>
+                            <p className="mt-3 text-sm text-muted-foreground">Gerencie sua assinatura e formas de pagamento nas seções abaixo.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="senha" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="font-display text-lg">Alterar Senha</CardTitle>
+                            <CardDescription>Defina uma nova senha de acesso.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="newPassword">Nova Senha</Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="newPassword"
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Mínimo 6 caracteres"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                        />
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>
+                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                                    <Input
+                                        id="confirmPassword"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Repita a senha"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end">
+                                <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
+                                    {changingPassword ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Alterando...</> : <><Lock className="mr-2 h-4 w-4" />Alterar Senha</>}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="cartoes" className="mt-4">
+                    <Card>
+                        <CardContent className="py-12 text-center text-muted-foreground">
+                            <CreditCard className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium text-foreground">Cartões</p>
+                            <p className="text-sm">Em breve. Você poderá cadastrar e gerenciar cartões aqui.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+
+            <Separator className="my-6" />
+            <div>
+                <h2 className="font-display text-xl font-bold text-foreground">Configurações gerais</h2>
+                <p className="mt-1 text-muted-foreground text-sm">Logo, IA, WhatsApp e integrações.</p>
+            </div>
 
             {/* Logo do escritório */}
             <Card>
@@ -345,64 +500,6 @@ const Configuracoes = () => {
                                 )}
                             </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Security Section */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
-                            <Lock className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <CardTitle className="font-display text-lg">Segurança</CardTitle>
-                            <CardDescription>Altere sua senha de acesso</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="newPassword">Nova Senha</Label>
-                            <div className="relative">
-                                <Input
-                                    id="newPassword"
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Mínimo 6 caracteres"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                                >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
-                            <Input
-                                id="confirmPassword"
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Repita a senha"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
-                            {changingPassword ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Alterando...</>
-                            ) : (
-                                <><Lock className="mr-2 h-4 w-4" />Alterar Senha</>
-                            )}
-                        </Button>
                     </div>
                 </CardContent>
             </Card>

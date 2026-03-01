@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Video, MapPin, Link as LinkIcon, Users, Clock, Sparkles, Loader2 } from "lucide-react";
+import { CalendarIcon, Video, MapPin, Link as LinkIcon, Users, Clock, Sparkles, Loader2, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useCrmClients } from "@/hooks/useCrm";
 import { useProcessos } from "@/hooks/useProcessos";
-import { useCreateAgendaEvent, useUpdateAgendaEvent } from "@/hooks/useAgendaEvents";
+import { useCreateAgendaEvent, useUpdateAgendaEvent, useDeleteAgendaEvent } from "@/hooks/useAgendaEvents";
 import { useAuth } from "@/contexts/AuthContext";
 import type { MeetingType } from "@/types/agenda";
 import type { AgendaEvent } from "@/types/agenda";
@@ -58,6 +58,7 @@ const NewMeetingModal = ({ open, onOpenChange, initialEvent, onCreated }: NewMee
   const { data: processos } = useProcessos();
   const createAgendaEvent = useCreateAgendaEvent();
   const updateAgendaEvent = useUpdateAgendaEvent();
+  const deleteAgendaEvent = useDeleteAgendaEvent();
   const isEdit = !!initialEvent?.id;
 
   useEffect(() => {
@@ -175,6 +176,19 @@ const NewMeetingModal = ({ open, onOpenChange, initialEvent, onCreated }: NewMee
       if (import.meta.env.DEV) console.error("[NewMeetingModal] createAgendaEvent failed", err);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!initialEvent?.id) return;
+    if (!window.confirm("Tem certeza que deseja excluir este evento?")) return;
+    try {
+      await deleteAgendaEvent.mutateAsync(initialEvent.id);
+      toast.success("Evento excluído.");
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao excluir evento.";
+      toast.error("Erro ao excluir", { description: msg });
     }
   };
 
@@ -319,17 +333,37 @@ const NewMeetingModal = ({ open, onOpenChange, initialEvent, onCreated }: NewMee
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={isCreating}>
-            {isCreating ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Salvando..." : "Criando..."}</>
-            ) : isEdit ? (
-              "Salvar"
-            ) : (
-              "Criar reunião"
+        <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
+          <div className="flex items-center">
+            {isEdit && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="gap-2"
+                onClick={handleDelete}
+                disabled={deleteAgendaEvent.isPending}
+              >
+                {deleteAgendaEvent.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Excluir evento
+              </Button>
             )}
-          </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={isCreating}>
+              {isCreating ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Salvando..." : "Criando..."}</>
+              ) : isEdit ? (
+                "Salvar"
+              ) : (
+                "Criar reunião"
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
